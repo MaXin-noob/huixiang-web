@@ -17,13 +17,20 @@ interface Blob {
   top: string;
   size: number;
   tilt: number;
+  /** 出场所需的最小视口宽度；不填表示一直显示 */
+  minWidth?: number;
 }
 
+// 前四个常驻；后四个是给大屏补位的，窗口够宽才出场（CSS 里按 nth-child 控制显隐）
 const BLOBS: Blob[] = [
   { id: 'violet', color: '#6c4bf6', size: 146, eye: 0.3, left: '38%', top: '9%', tilt: 5 },
   { id: 'green', color: '#1f7a3e', size: 116, eye: 0.31, left: '6%', top: '29%', tilt: -6 },
   { id: 'amber', color: '#e08a1e', size: 102, eye: 0.3, left: '71%', top: '33%', tilt: -4 },
   { id: 'ink', color: '#1f2328', size: 124, eye: 0.29, left: '26%', top: '57%', tilt: 3 },
+  { id: 'plum', color: '#8b6ff8', size: 96, eye: 0.3, left: '57%', top: '62%', tilt: 6, minWidth: 1600 },
+  { id: 'moss', color: '#2f9e57', size: 88, eye: 0.31, left: '8%', top: '72%', tilt: -5, minWidth: 1900 },
+  { id: 'clay', color: '#f0a94b', size: 84, eye: 0.3, left: '69%', top: '78%', tilt: 4, minWidth: 2200 },
+  { id: 'slate', color: '#3b414c', size: 92, eye: 0.29, left: '30%', top: '84%', tilt: -3, minWidth: 2500 },
 ];
 
 /** 眼珠最多能偏出去多少像素，跟参考项目里 data-max-distance 一个意思 */
@@ -50,6 +57,8 @@ export default function PeekGuard({ guard }: { guard: boolean }) {
           pupil.style.transform = 'translate(-3px, -4px)';
           continue;
         }
+        // 大屏才出场的角色在窄窗口下是 display:none，没必要每帧量它
+        if (!eye.getClientRects().length) continue;
         const rect = eye.getBoundingClientRect();
         const dx = x - (rect.left + rect.width / 2);
         const dy = y - (rect.top + rect.height / 2);
@@ -98,14 +107,17 @@ export default function PeekGuard({ guard }: { guard: boolean }) {
         return (
           <div
             key={blob.id}
-            className="peek-blob"
+            className={`peek-blob${blob.minWidth ? ' peek-blob--extra' : ''}`}
+            data-min-width={blob.minWidth ?? undefined}
             style={{
-              width: blob.size,
-              height: Math.round(blob.size * 0.92),
+              // 尺寸走 CSS 变量 + --peek-scale，大屏时整体跟着放大一点
+              ['--blob-w' as string]: `${blob.size}px`,
+              width: 'calc(var(--blob-w) * var(--peek-scale))',
+              height: 'calc(var(--blob-w) * 0.92 * var(--peek-scale))',
               left: blob.left,
               top: blob.top,
               background: blob.color,
-              borderRadius: Math.round(blob.size * 0.44),
+              borderRadius: 'calc(var(--blob-w) * 0.44 * var(--peek-scale))',
               // CSS 变量把倾斜角传下去，捂眼时整体再往外转一圈
               ['--blob-tilt' as string]: `${blob.tilt}deg`,
             }}
@@ -116,9 +128,9 @@ export default function PeekGuard({ guard }: { guard: boolean }) {
                   key={side}
                   className="peek-eye"
                   style={{
-                    width: eye,
-                    height: eye,
-                    ['--eye-size' as string]: `${eye}px`,
+                    ['--eye-w' as string]: `${eye}px`,
+                    width: 'calc(var(--eye-w) * var(--peek-scale))',
+                    height: 'calc(var(--eye-w) * var(--peek-scale))',
                   }}
                 >
                   <span
@@ -126,7 +138,10 @@ export default function PeekGuard({ guard }: { guard: boolean }) {
                       pupils.current[index * 2 + side] = node;
                     }}
                     className="peek-pupil"
-                    style={{ width: Math.round(eye * 0.42), height: Math.round(eye * 0.42) }}
+                    style={{
+                      width: 'calc(var(--eye-w) * 0.42 * var(--peek-scale))',
+                      height: 'calc(var(--eye-w) * 0.42 * var(--peek-scale))',
+                    }}
                   />
                 </span>
               ))}
