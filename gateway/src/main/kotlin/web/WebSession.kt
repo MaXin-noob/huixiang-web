@@ -492,7 +492,10 @@ class WebSession(
                 parent = parent ?: cur.parent,
                 after = after ?: cur.after,
             )
-            sendOp(c, "修改频道", ChannelEdits.edit(ch, s))
+            val edits = ChannelEdits.edit(ch, s).toMutableList()
+            // edit() 只在换父级时才带 order；同一父级下的排序要单独发一次 channel_order。
+            if (s.parent == ch.parent && s.after != cur.after) edits += ChannelEdits.reorder(ch, s.after)
+            sendOp(c, "修改频道", edits)
         }
     }
 

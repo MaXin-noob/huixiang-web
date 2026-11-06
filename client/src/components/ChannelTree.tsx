@@ -3,6 +3,7 @@ import { Dropdown } from '@douyinfe/semi-ui';
 import {
   IconChevronDown,
   IconChevronRight,
+  IconChevronUp,
   IconDelete,
   IconEdit,
   IconLock,
@@ -11,6 +12,7 @@ import {
   IconPlus,
   IconVolumnSilent,
 } from '@douyinfe/semi-icons';
+import { findChannel } from '../protocol';
 import type { ChannelNode, Member } from '../protocol';
 import ChannelIcon from './ChannelIcon';
 
@@ -24,6 +26,8 @@ interface Props {
   onCreateChannel: (parent: number) => void;
   onEditChannel: (channel: ChannelNode) => void;
   onDeleteChannel: (channel: ChannelNode) => void;
+  /** 频道排序：在同级里上移 / 下移（after = 排在其后的频道 id，0 表示最前）。 */
+  onReorderChannel: (channel: ChannelNode, after: number) => void;
   /** 头像令牌：频道图标地址里带它（<img> 不能带 header）。 */
   avatarToken?: string;
   /** 成员管理（可选）：别的频道里的人也能踢 / 封 */
@@ -119,6 +123,7 @@ export default function ChannelTree({
   onCreateChannel,
   onEditChannel,
   onDeleteChannel,
+  onReorderChannel,
   avatarToken,
   onKick,
   onBan,
@@ -135,27 +140,49 @@ export default function ChannelTree({
     });
   };
 
-  const menuFor = (channel: ChannelNode) => [
-    {
-      node: 'item' as const,
-      name: '新建子频道',
-      icon: <IconPlus size="small" />,
-      onClick: () => onCreateChannel(channel.id),
-    },
-    {
-      node: 'item' as const,
-      name: '编辑频道',
-      icon: <IconEdit size="small" />,
-      onClick: () => onEditChannel(channel),
-    },
-    {
-      node: 'item' as const,
-      name: '删除频道',
-      icon: <IconDelete size="small" />,
-      type: 'danger' as const,
-      onClick: () => onDeleteChannel(channel),
-    },
-  ];
+  const menuFor = (channel: ChannelNode) => {
+    // 同级兄弟按当前显示顺序排列；parent 为 0 表示顶层，直接取整棵树。
+    const siblings = channel.parent ? (findChannel(tree, channel.parent)?.children ?? tree) : tree;
+    const idx = siblings.findIndex((c) => c.id === channel.id);
+    const canUp = idx > 0;
+    const canDown = idx >= 0 && idx < siblings.length - 1;
+    return [
+      {
+        node: 'item' as const,
+        name: '上移',
+        icon: <IconChevronUp size="small" />,
+        disabled: !canUp,
+        onClick: () => onReorderChannel(channel, idx - 1 <= 0 ? 0 : siblings[idx - 2].id),
+      },
+      {
+        node: 'item' as const,
+        name: '下移',
+        icon: <IconChevronDown size="small" />,
+        disabled: !canDown,
+        onClick: () => onReorderChannel(channel, siblings[idx + 1].id),
+      },
+      { node: 'divider' as const },
+      {
+        node: 'item' as const,
+        name: '新建子频道',
+        icon: <IconPlus size="small" />,
+        onClick: () => onCreateChannel(channel.id),
+      },
+      {
+        node: 'item' as const,
+        name: '编辑频道',
+        icon: <IconEdit size="small" />,
+        onClick: () => onEditChannel(channel),
+      },
+      {
+        node: 'item' as const,
+        name: '删除频道',
+        icon: <IconDelete size="small" />,
+        type: 'danger' as const,
+        onClick: () => onDeleteChannel(channel),
+      },
+    ];
+  };
 
   if (rows.length === 0) {
     return <div className="rail-body">这个服务器还没有频道</div>;
