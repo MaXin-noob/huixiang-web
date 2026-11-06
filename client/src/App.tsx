@@ -984,6 +984,8 @@ export default function App() {
   }, [
     state,
     visibleChat,
+    // memo 里除了 visibleChat 还直接用了原始 chat（allChat={chat}），漏写会拿到过期列表
+    chat,
     historyMore,
     historyBusy,
     files,
@@ -1005,6 +1007,7 @@ export default function App() {
     voiceTalking,
     ownTalking,
     micMode,
+    setMicMode,
     pttHeld,
     audioReady,
     streamState,
@@ -1016,6 +1019,7 @@ export default function App() {
     joinChannel,
     loadMoreHistory,
     say,
+    sayTo,
     listFiles,
     rename,
     changeMicGain,
