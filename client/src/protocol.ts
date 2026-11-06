@@ -396,6 +396,7 @@ const KEY = {
   volumes: 'huixiang.volumes',
   notify: 'huixiang.notify',
   accountLogin: 'huixiang.accountLogin',
+  agreed: 'huixiang.agreed',
   mutePref: 'huixiang.mutePref',
 };
 
@@ -442,6 +443,15 @@ export const store = {
       return;
     }
     localStorage.setItem(KEY.accountLogin, btoa(unescape(encodeURIComponent(JSON.stringify(v)))));
+  },
+
+  /** 协议勾选状态：勾过一次就记住，下次打开仍是勾上的。 */
+  agreed(): boolean {
+    return localStorage.getItem(KEY.agreed) === '1';
+  },
+  setAgreed(v: boolean) {
+    if (v) localStorage.setItem(KEY.agreed, '1');
+    else localStorage.removeItem(KEY.agreed);
   },
 
   /** 最近连过的服务器，最近的在前面。 */

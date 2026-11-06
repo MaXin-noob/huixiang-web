@@ -146,10 +146,9 @@ const SOCIALS = [
   },
 ];
 
-// 退出服务器会重新挂载这个组件：地址和协议勾选留一份在模块里，
-// 免得每次退回来都得重填地址、重勾协议（页面一刷新就回到初始状态）
+// 退出服务器会重新挂载这个组件：地址留一份在模块里，免得每次退回来都得重填
+// （协议勾选走 localStorage，刷新浏览器也还在）
 let lastAddress = '';
-let agreedOnce = false;
 
 /** 两个页签：登录 myTeamSpeak 账号，或者干脆当游客 */
 type Mode = 'account' | 'guest';
@@ -182,7 +181,11 @@ export default function ConnectPage({
   const [otp, setOtp] = useState('');
   const [showOtp, setShowOtp] = useState(false);
   const [showAccountPassword, setShowAccountPassword] = useState(false);
-  const [agreed, setAgreed] = useState(agreedOnce);
+  const [agreed, setAgreedState] = useState(() => store.agreed());
+  const setAgreed = (next: boolean) => {
+    setAgreedState(next);
+    store.setAgreed(next);
+  };
   // 一进来就停在 MyTeamSpeak 登录（要游客登录再点页签），符合「默认打开即是登录页」
   const [mode, setMode] = useState<Mode>('account');
   // 捂眼：只要光标落在密码类输入框里，右边的小家伙就集体避开视线
@@ -543,36 +546,48 @@ export default function ConnectPage({
                     <div className="login-field">{gatewayTokenField}</div>
 
                     {showOtp ? (
-                      <div className="login-field">
-                        <Input
-                          id="account-otp"
-                          size="large"
-                          style={inputStyle}
-                          prefix={<IconKey />}
-                          placeholder="两步验证码"
-                          value={otp}
-                          onChange={setOtp}
-                          onEnterPress={submitLogin}
-                          onFocus={peek}
-                          onBlur={uncover}
-                          disabled={accountBusy || loggingIn}
-                          maxLength={64}
-                        />
-                      </div>
+                      <>
+                        <div className="login-field">
+                          <Input
+                            id="account-otp"
+                            size="large"
+                            style={inputStyle}
+                            prefix={<IconKey />}
+                            placeholder="两步验证码"
+                            value={otp}
+                            onChange={setOtp}
+                            onEnterPress={submitLogin}
+                            onFocus={peek}
+                            onBlur={uncover}
+                            disabled={accountBusy || loggingIn}
+                            maxLength={64}
+                          />
+                        </div>
+                        <label className="login-remember">
+                          <input
+                            type="checkbox"
+                            checked={remember}
+                            onChange={(e) => toggleRemember(e.target.checked)}
+                          />
+                          <span>记住密码</span>
+                        </label>
+                      </>
                     ) : (
-                      <button type="button" className="field-link login-otp-link" onClick={() => setShowOtp(true)}>
-                        账号开启了两步验证？
-                      </button>
+                      // 没展开两步验证时，验证入口和「记住密码」并排一行
+                      <div className="login-extras">
+                        <button type="button" className="field-link login-otp-link" onClick={() => setShowOtp(true)}>
+                          账号开启了两步验证？
+                        </button>
+                        <label className="login-remember">
+                          <input
+                            type="checkbox"
+                            checked={remember}
+                            onChange={(e) => toggleRemember(e.target.checked)}
+                          />
+                          <span>记住密码</span>
+                        </label>
+                      </div>
                     )}
-
-                    <label className="login-remember">
-                      <input
-                        type="checkbox"
-                        checked={remember}
-                        onChange={(e) => toggleRemember(e.target.checked)}
-                      />
-                      <span>记住密码</span>
-                    </label>
 
                     <button
                       type="button"
@@ -672,7 +687,6 @@ export default function ConnectPage({
                 type="checkbox"
                 checked={agreed}
                 onChange={(e) => {
-                  agreedOnce = e.target.checked;
                   setAgreed(e.target.checked);
                 }}
               />
@@ -716,9 +730,6 @@ export default function ConnectPage({
               <span className="brand-name">回响</span>
               <span className="brand-sub">网页版 · 不必安装，推门即入</span>
             </div>
-            <span className="login-brand-hint" aria-live="polite">
-              {hiding ? '嘘，我们不看' : '眼睛会跟着你'}
-            </span>
           </div>
         </aside>
       </div>
