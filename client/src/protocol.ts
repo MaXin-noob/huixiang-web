@@ -395,6 +395,7 @@ const KEY = {
   micMode: 'huixiang.micMode',
   volumes: 'huixiang.volumes',
   notify: 'huixiang.notify',
+  accountLogin: 'huixiang.accountLogin',
   mutePref: 'huixiang.mutePref',
 };
 
@@ -418,6 +419,31 @@ export const store = {
   setNickname(v: string) {
     localStorage.setItem(KEY.nickname, v);
   },
+  /**
+   * 「记住密码」留下的 myTeamSpeak 账号 + 密码。
+   * 只存这台浏览器，不上传；base64 只是不让它一眼可见，**不是加密**。
+   */
+  accountLogin(): { email: string; password: string } | null {
+    const raw = localStorage.getItem(KEY.accountLogin);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(decodeURIComponent(escape(atob(raw))));
+      if (typeof parsed?.email === 'string' && typeof parsed?.password === 'string') {
+        return { email: parsed.email, password: parsed.password };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+  setAccountLogin(v: { email: string; password: string } | null) {
+    if (!v?.email) {
+      localStorage.removeItem(KEY.accountLogin);
+      return;
+    }
+    localStorage.setItem(KEY.accountLogin, btoa(unescape(encodeURIComponent(JSON.stringify(v)))));
+  },
+
   /** 最近连过的服务器，最近的在前面。 */
   recent(): string[] {
     try {
