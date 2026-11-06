@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Input, Toast } from '@douyinfe/semi-ui';
-import { IconClose, IconGlobe, IconKey, IconServer } from '@douyinfe/semi-icons';
+import { IconGlobe, IconKey, IconLock, IconServer, IconUser } from '@douyinfe/semi-icons';
 import { accountErrorText } from '../account';
 import {
   accountNickname,
@@ -12,6 +12,7 @@ import {
   type ConnectOptions,
 } from '../protocol';
 import UserAvatar from './UserAvatar';
+import PeekGuard from './PeekGuard';
 
 /** 从用户输入里拿地址和端口：支持 `host`、`host:port`、`[v6]:port`，也认 ts3server:// 邀请开头。 */
 function parseAddress(raw: string): { host: string; port: number } | null {
@@ -42,7 +43,116 @@ interface Props {
   onAccountRefresh: () => void;
 }
 
-const inputStyle = { height: 44 };
+const inputStyle = { height: 48 };
+
+/** 密码类输入框右侧的眼睛按钮：睁眼=明文，闭眼（带斜杠）=已遮挡 */
+function RevealButton({ shown, onToggle }: { shown: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      className="login-reveal"
+      aria-label={shown ? '隐藏' : '显示'}
+      title={shown ? '隐藏' : '显示'}
+      onClick={onToggle}
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      {shown ? (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M2.4 12S6 5.6 12 5.6 21.6 12 21.6 12 18 18.4 12 18.4 2.4 12 2.4 12Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M2.4 12S6 5.6 12 5.6 21.6 12 21.6 12 18 18.4 12 18.4 2.4 12 2.4 12Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M4.4 19.6 19.6 4.4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+/** 底部「其他登录方式」的三个入口：图标都是手写的，Semi 图标库里没有对应款 */
+const SOCIALS = [
+  {
+    id: 'wechat',
+    label: '微信登录',
+    icon: (
+      <svg className="login-social-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M9.2 4.4c-3.5 0-6.4 2.3-6.4 5.2 0 1.6.9 3.1 2.4 4.1l-.6 2 2.2-1.1c.8.2 1.6.3 2.4.3h.5a5 5 0 0 1-.2-1.4c0-3 2.9-5.3 6.5-5.3h.4c-.5-2.2-3.1-3.8-6.2-3.8Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M21.2 13.1c0-2.4-2.4-4.3-5.3-4.3s-5.3 1.9-5.3 4.3 2.4 4.3 5.3 4.3c.6 0 1.3-.1 1.9-.3l1.8.9-.5-1.6c1.3-.8 2.1-2 2.1-3.3Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    id: 'qq',
+    label: 'QQ 登录',
+    icon: (
+      <svg className="login-social-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <ellipse cx="12" cy="13.6" rx="5.1" ry="7.5" fill="currentColor" />
+        <ellipse cx="12" cy="15.9" rx="3.05" ry="4" fill="#fff" />
+        <circle cx="10.1" cy="9.6" r="1.5" fill="#fff" />
+        <circle cx="13.9" cy="9.6" r="1.5" fill="#fff" />
+        <circle cx="10.1" cy="9.8" r="0.6" fill="currentColor" />
+        <circle cx="13.9" cy="9.8" r="0.6" fill="currentColor" />
+        <path d="M11.1 12.1h1.8l-.9 1.5z" fill="#fff" />
+        <ellipse cx="9.7" cy="21" rx="1.7" ry="0.85" fill="currentColor" />
+        <ellipse cx="14.3" cy="21" rx="1.7" ry="0.85" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    id: 'github',
+    label: 'GitHub 登录',
+    icon: (
+      <svg className="login-social-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M12 .8a11.2 11.2 0 0 0-3.54 21.83c.56.1.77-.24.77-.54v-1.9c-3.12.68-3.78-1.5-3.78-1.5-.51-1.3-1.25-1.64-1.25-1.64-1.02-.7.08-.68.08-.68 1.13.08 1.72 1.16 1.72 1.16 1 1.72 2.63 1.22 3.27.94.1-.73.39-1.22.71-1.5-2.49-.29-5.1-1.25-5.1-5.55 0-1.23.43-2.23 1.15-3.02-.12-.29-.5-1.43.11-2.98 0 0 .94-.3 3.1 1.15a10.7 10.7 0 0 1 5.64 0c2.16-1.45 3.1-1.15 3.1-1.15.61 1.55.23 2.69.11 2.98.72.79 1.15 1.79 1.15 3.02 0 4.31-2.62 5.26-5.12 5.54.4.35.76 1.03.76 2.08v3.09c0 .3.2.65.78.54A11.2 11.2 0 0 0 12 .8Z"
+          fill="currentColor"
+        />
+      </svg>
+    ),
+  },
+];
+
+// 退出服务器会重新挂载这个组件：地址和协议勾选留一份在模块里，
+// 免得每次退回来都得重填地址、重勾协议（页面一刷新就回到初始状态）
+let lastAddress = '';
+let agreedOnce = false;
+
+/** 两个页签：登录 myTeamSpeak 账号，或者干脆当游客 */
+type Mode = 'account' | 'guest';
 
 export default function ConnectPage({
   tokenNeeded,
@@ -58,28 +168,46 @@ export default function ConnectPage({
   onAccountLogout,
   onAccountRefresh,
 }: Props) {
-  const [address, setAddress] = useState('');
+  const [address, setAddressState] = useState(lastAddress);
+  const setAddress = (next: string) => {
+    lastAddress = next;
+    setAddressState(next);
+  };
   const [nickname, setNickname] = useState(() => store.nickname());
   const [password, setPassword] = useState('');
-  const [passwordOpen, setPasswordOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [loginOpen, setLoginOpen] = useState(false);
-  const [accountEmail, setAccountEmail] = useState('');
-  const [accountPassword, setAccountPassword] = useState('');
+  const [accountEmail, setAccountEmail] = useState(() => store.accountLogin()?.email ?? '');
+  const [accountPassword, setAccountPassword] = useState(() => store.accountLogin()?.password ?? '');
+  const [remember, setRemember] = useState(() => store.accountLogin() !== null);
   const [otp, setOtp] = useState('');
   const [showOtp, setShowOtp] = useState(false);
   const [showAccountPassword, setShowAccountPassword] = useState(false);
+  const [agreed, setAgreed] = useState(agreedOnce);
+  // 一进来就停在 MyTeamSpeak 登录（要游客登录再点页签），符合「默认打开即是登录页」
+  const [mode, setMode] = useState<Mode>('account');
+  // 捂眼：只要光标落在密码类输入框里，右边的小家伙就集体避开视线
+  const [hiding, setHiding] = useState(false);
   const lastAutoNick = useRef('');
   const recent = useMemo(() => store.recent(), []);
   const parsed = parseAddress(address);
-  const signedIn = account.phase === 'signedIn';
+  // 网关刚退出登录时会推一条「已登录但没名字」的中间态，别拿它当登录成功
+  const signedIn = account.phase === 'signedIn' && !!(account.username || account.email);
   // 已登录时昵称固定是账号名，输入框只做展示；游客才用自己填的昵称
   const accountNick = accountNickname(account);
   const nick = effectiveNickname(account, nickname);
-  const canConnect = !!parsed && nick.trim().length > 0 && (!tokenNeeded || token.trim().length > 0);
+  const canConnect = !!parsed && nick.trim().length > 0 && (!tokenNeeded || token.trim().length > 0) && agreed;
   const accountBusy = account.phase === 'busy';
+  // 账号页签只填账号、密码、口令（要网关口令的话），协议勾上就能点「登录」；
+  // 服务器地址和服务器密码留到登录后的中间页再填，那里还能挑云书签。
   const canLogin =
-    !!accountEmail.trim() && !!accountPassword && (!tokenNeeded || token.trim().length > 0) && !accountBusy;
+    !!accountEmail.trim() &&
+    accountPassword.length > 0 &&
+    (!tokenNeeded || token.trim().length > 0) &&
+    !accountBusy &&
+    agreed;
+
+  const peek = () => setHiding(true);
+  const uncover = () => setHiding(false);
 
   // 只有一个地址时进页面直接填上，省一次输入。
   // 只在首次填充，之后用户删掉就是删掉——不能「地址一空就补回来」，否则永远删不掉。
@@ -108,21 +236,72 @@ export default function ConnectPage({
     });
   }, [account.phase, account.username]);
 
+  // 登录成功后自动停到账号页签，方便直接挑云书签
+  useEffect(() => {
+    if (account.phase === 'signedIn') setMode('account');
+  }, [account.phase]);
+
   // 需要两步验证时，网关会说 208/209；把验证码输入框露出来。
   useEffect(() => {
-    if (account.error === 'MYTS_208' || account.error === 'MYTS_209') {
-      setLoginOpen(true);
-      setShowOtp(true);
-    }
+    if (account.error === 'MYTS_208' || account.error === 'MYTS_209') setShowOtp(true);
   }, [account.error]);
 
-  // 主动退出后收起登录表单；登录失败（有错误码）时留着，方便改完再试。
+  // 连服务器失败（口令错、地址不通…）：用和「功能开发中」一样的 Toast 提示
+  const lastError = useRef<string | null>(null);
   useEffect(() => {
-    if (account.phase === 'guest' && !account.error) setLoginOpen(false);
-  }, [account.phase, account.error]);
+    if (!error) {
+      lastError.current = null;
+      return;
+    }
+    if (lastError.current === error) return;
+    lastError.current = error;
+    Toast.error({ content: error, duration: 4 });
+    onDismissError();
+  }, [error, onDismissError]);
+
+  // 账号密码错、两步验证码错：同样走 Toast
+  const lastAccountError = useRef<string | null>(null);
+  useEffect(() => {
+    if (!account.error) {
+      lastAccountError.current = null;
+      return;
+    }
+    if (lastAccountError.current === account.error) return;
+    lastAccountError.current = account.error;
+    Toast.error({ content: accountErrorText(account.error), duration: 4 });
+  }, [account.error]);
+
+  // 记住密码：登录成功后按勾选状态写入/清除本地
+  const rememberRef = useRef(remember);
+  rememberRef.current = remember;
+  const emailRef = useRef(accountEmail);
+  emailRef.current = accountEmail;
+  const accountPwdRef = useRef(accountPassword);
+  accountPwdRef.current = accountPassword;
+  useEffect(() => {
+    if (account.phase !== 'signedIn') return;
+    if (rememberRef.current && emailRef.current.trim()) {
+      store.setAccountLogin({ email: emailRef.current.trim(), password: accountPwdRef.current });
+    }
+  }, [account.phase]);
+
+  const toggleRemember = (next: boolean) => {
+    setRemember(next);
+    if (!next) store.setAccountLogin(null);
+  };
+
+  // 点云书签：把地址/昵称/服务器密码一次性填进中间页的表单
+  const applyBookmark = (bookmark: Bookmark) => {
+    setAddress(bookmark.address);
+    setNickname(bookmark.nickname.trim() || account.username || nickname);
+    setPassword(bookmark.password);
+    if (bookmark.password) setShowPassword(true);
+    Toast.info({ content: bookmark.password ? '已填入云书签，含服务器密码' : '已填入云书签', duration: 2 });
+  };
 
   const submit = () => {
     if (!parsed || !canConnect) return;
+    lastError.current = null;
     onConnect({
       host: parsed.host,
       port: parsed.port,
@@ -132,349 +311,437 @@ export default function ConnectPage({
     });
   };
 
+  // 点「登录」：先弹「正在登录…」，验完 myTeamSpeak 账号就停在中间页（云书签 + 地址 + 服务器密码）
+  const [loggingIn, setLoggingIn] = useState(false);
+  const loggingInRef = useRef(false);
+  const closeLoginToast = () => Toast.close('login-pending');
+
+  useEffect(() => {
+    if (!loggingInRef.current) return;
+    if (signedIn || account.error) {
+      loggingInRef.current = false;
+      setLoggingIn(false);
+      closeLoginToast();
+    }
+  }, [signedIn, account]);
+
   const submitLogin = () => {
+    if (signedIn) {
+      submit();
+      return;
+    }
     if (!canLogin) return;
-    setLoginOpen(true);
+    lastAccountError.current = null;
+    lastError.current = null;
+    loggingInRef.current = true;
+    setLoggingIn(true);
+    Toast.info({ id: 'login-pending', content: '正在登录…', duration: 10 });
+    // 兜底：网关没回话（比如网关口令不对，连网关都开不起来）也别让按钮一直转
+    window.setTimeout(() => {
+      if (!loggingInRef.current) return;
+      loggingInRef.current = false;
+      setLoggingIn(false);
+      closeLoginToast();
+    }, 15000);
     onAccountLogin(accountEmail.trim(), accountPassword, otp.trim());
   };
 
-  const applyBookmark = (bookmark: Bookmark) => {
-    setAddress(bookmark.address);
-    setNickname(bookmark.nickname.trim() || account.username || nickname);
-    setPassword(bookmark.password);
-    if (bookmark.password) setPasswordOpen(true);
-    Toast.info(bookmark.password ? '已填入云书签，含服务器密码' : '已填入云书签');
-  };
+  // 服务器地址 + 口令，两个页签都要用，提出来省得抄一遍
+  const addressField = (
+    <>
+      <Input
+        id="addr"
+        size="large"
+        style={inputStyle}
+        prefix={<IconGlobe />}
+        placeholder="请输入服务器地址"
+        value={address}
+        onChange={setAddress}
+        onEnterPress={submit}
+        showClear
+      />
+      {address && !parsed && <span className="field-error">地址看不懂，端口要 1–65535</span>}
+    </>
+  );
+
+  const passwordField = (
+    <Input
+      id="pwd"
+      size="large"
+      style={inputStyle}
+      prefix={<IconKey />}
+      type={showPassword ? 'text' : 'password'}
+      placeholder="请输入服务器口令"
+      value={password}
+      onChange={setPassword}
+      onEnterPress={submit}
+      onFocus={peek}
+      onBlur={uncover}
+      suffix={<RevealButton shown={showPassword} onToggle={() => setShowPassword((v) => !v)} />}
+    />
+  );
+
+  const middlePasswordField = (
+    <Input
+      id="server-pwd"
+      size="large"
+      style={inputStyle}
+      prefix={<IconKey />}
+      type={showPassword ? 'text' : 'password'}
+      placeholder="请输入服务器密码，没有就留空"
+      value={password}
+      onChange={setPassword}
+      onEnterPress={submit}
+      onFocus={peek}
+      onBlur={uncover}
+      suffix={<RevealButton shown={showPassword} onToggle={() => setShowPassword((v) => !v)} />}
+    />
+  );
+
+  // 登录页的第三个框就是网关的访问口令（站主给的那串），服务器密码留到中间页再填
+  const gatewayTokenField = (
+    <Input
+      id="token"
+      size="large"
+      style={inputStyle}
+      prefix={<IconServer />}
+      placeholder="请输入网关访问口令"
+      value={token}
+      onChange={(v) => {
+        // 网关口令是站主定死的值，填过一次就留在本地，下次打开直接带出来
+        onTokenChange(v);
+        store.setToken(v);
+      }}
+      onEnterPress={submitLogin}
+      onFocus={peek}
+      onBlur={uncover}
+    />
+  );
+
+  const tokenField = tokenNeeded ? (
+    <div className="login-field">
+      <Input
+        id="token"
+        size="large"
+        style={inputStyle}
+        prefix={<IconServer />}
+        placeholder="站主给的访问口令"
+        value={token}
+        onChange={onTokenChange}
+        onEnterPress={submit}
+        onFocus={peek}
+        onBlur={uncover}
+      />
+      <span className="login-hint">口令只存在这台浏览器里</span>
+    </div>
+  ) : null;
+
+  // 设计稿里「最近连过」是这个页签的固定一块，没有历史时给一句空态，不留白
+  const recentBlock = (
+    <div className="recent">
+      <span className="recent-label">最近连过</span>
+      {recent.length > 0 ? (
+        <div className="recent-list">
+          {recent.map((r) => (
+            <button key={r} type="button" className="recent-item" onClick={() => setAddress(r)}>
+              <IconServer size="small" />
+              <span>{r}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <span className="login-hint">连过一次之后，这里会留下记录，点一下就能回到那台服务器。</span>
+      )}
+    </div>
+  );
 
   return (
-    <div className="connect-page">
-      <div className="connect-card">
-        <div className="brand">
-          <img className="brand-mark" src="/icons/icon-96.png" alt="" aria-hidden="true" />
-          <div className="brand-text">
-            <span className="brand-name">回响</span>
-            <span className="brand-sub">网页版 · 不用装客户端</span>
-          </div>
-        </div>
-
-        {error && (
-          <div
-            role="alert"
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 8,
-              padding: '9px 10px 9px 12px',
-              borderRadius: 10,
-              background: 'var(--danger-soft)',
-              color: '#a3242b',
-            }}
-          >
-            <span style={{ flex: 1, fontSize: 12, lineHeight: '18px', minWidth: 0 }}>{error}</span>
-            <button type="button" className="icon-btn" onClick={onDismissError} aria-label="关闭提示">
-              <IconClose size="small" />
-            </button>
-          </div>
-        )}
-
-        <section className="account-card" aria-label="myTeamSpeak 账号">
-          <div className="account-head">
-            <UserAvatar
-              name={signedIn ? account.username || account.email : '?'}
-              sources={signedIn && account.avatarUrl ? [account.avatarUrl] : []}
-              colorKey={signedIn ? account.username || account.email : 'guest'}
-              className="account-avatar"
-              label={signedIn ? `${account.username} 的头像` : undefined}
-            />
-            <div className="account-id">
-              <span className="account-title">
-                {signedIn ? account.username || 'myTeamSpeak 账号' : 'myTeamSpeak 账号'}
-              </span>
-              <span className="account-sub">
-                {signedIn
-                  ? account.email || '已登录'
-                  : accountBusy
-                    ? '正在登录…'
-                    : '登录后同步云书签；不登录也能以游客身份进入'}
-              </span>
+    <div className="login-shell">
+      <div className="login-panel">
+        <section className="login-form-side">
+          <div className="login-form">
+            {/* 窄屏没有右侧面板，品牌信息挪到这里 */}
+            <div className="login-mobile-brand">
+              <img className="brand-mark" src="/icons/icon-96.png" alt="" aria-hidden="true" />
+              <span className="brand-name">回响</span>
             </div>
-            {signedIn ? (
-              <div className="account-links">
-                <button type="button" className="field-link" onClick={onAccountRefresh}>
-                  刷新
-                </button>
-                <button type="button" className="field-link" onClick={onAccountLogout}>
-                  退出
-                </button>
-              </div>
-            ) : (
-              <button type="button" className="field-link" onClick={() => setLoginOpen((v) => !v)}>
-                {loginOpen ? '收起' : '登录'}
-              </button>
-            )}
-          </div>
 
-          {!signedIn && loginOpen && (
-            <div className="account-login">
-              <div className="field">
-                <label className="field-label" htmlFor="account-email">
-                  myTeamSpeak 邮箱
-                </label>
-                <Input
-                  id="account-email"
-                  size="large"
-                  style={inputStyle}
-                  placeholder="登录 myTeamSpeak 的邮箱"
-                  value={accountEmail}
-                  onChange={setAccountEmail}
-                  onEnterPress={submitLogin}
-                  disabled={accountBusy}
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="account-password">
-                  账号密码
-                </label>
-                <Input
-                  id="account-password"
-                  size="large"
-                  style={inputStyle}
-                  type={showAccountPassword ? 'text' : 'password'}
-                  placeholder="不是服务器密码"
-                  value={accountPassword}
-                  onChange={setAccountPassword}
-                  onEnterPress={submitLogin}
-                  disabled={accountBusy}
-                  suffix={
-                    <button
-                      type="button"
-                      className="field-link"
-                      onClick={() => setShowAccountPassword((v) => !v)}
-                    >
-                      {showAccountPassword ? '隐藏' : '显示'}
-                    </button>
-                  }
-                />
-              </div>
-              {showOtp ? (
-                <div className="field">
-                  <label className="field-label" htmlFor="account-otp">
-                    两步验证码
-                  </label>
-                  <Input
-                    id="account-otp"
-                    size="large"
-                    style={inputStyle}
-                    placeholder="账号开启两步验证时填写"
-                    value={otp}
-                    onChange={setOtp}
-                    onEnterPress={submitLogin}
-                    disabled={accountBusy}
-                    maxLength={64}
-                  />
-                </div>
-              ) : (
-                <button type="button" className="field-link" onClick={() => setShowOtp(true)}>
-                  账号开启了两步验证？
-                </button>
-              )}
-              {account.error && <span className="field-error">{accountErrorText(account.error)}</span>}
-              {tokenNeeded && !token.trim() && (
-                <span className="field-help">先在下面填写网关访问口令，再登录账号。</span>
-              )}
+            <div className="login-tabs" role="tablist" aria-label="登录方式">
               <button
                 type="button"
-                className="connect-submit account-login-submit"
-                disabled={!canLogin}
-                onClick={submitLogin}
+                role="tab"
+                aria-selected={mode === 'account'}
+                className={`login-tab${mode === 'account' ? ' is-active' : ''}`}
+                onClick={() => setMode('account')}
               >
-                {accountBusy ? '正在登录…' : '登录 myTeamSpeak'}
+                MyTeamSpeak 登录
               </button>
-              <span className="field-help">
-                密码只发给网关换取这次登录，不写进浏览器存储；登录状态会记在这台浏览器里，网关重启后需要重新登录。
-              </span>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === 'guest'}
+                className={`login-tab${mode === 'guest' ? ' is-active' : ''}`}
+                onClick={() => setMode('guest')}
+              >
+                游客登录
+              </button>
             </div>
-          )}
 
-          {signedIn && (
-            <>
-              <div className="account-section">
-                <div className="account-section-head">
-                  <span className="account-section-title">云书签</span>
-                  <span className="account-section-count">
-                    {bookmarks.loading ? '同步中…' : `${bookmarks.items.length} 个`}
-                  </span>
-                </div>
-                {bookmarks.error ? (
-                  <span className="field-error">{accountErrorText(bookmarks.error)}</span>
-                ) : bookmarks.items.length === 0 && !bookmarks.loading ? (
-                  <span className="field-help">这个账号还没有保存服务器书签。</span>
-                ) : (
-                  <div className="saved-list">
-                    {bookmarks.items.map((bookmark) => (
-                      <button
-                        key={bookmark.id}
-                        type="button"
-                        className="saved-item"
-                        onClick={() => applyBookmark(bookmark)}
-                        title={`填入 ${bookmark.address}`}
-                      >
-                        <IconServer size="small" />
-                        <span className="saved-main">
-                          <span className="saved-name">{bookmark.name || bookmark.address}</span>
-                          <span className="saved-sub">{bookmark.address}</span>
-                        </span>
-                        {bookmark.password && (
-                          <span className="saved-key" title="云书签里有服务器密码，填入后自动使用">
-                            <IconKey size="small" />
-                          </span>
-                        )}
+            <h1 className="login-title">
+              {mode === 'account' ? (signedIn ? '选择服务器' : 'MyTeamSpeak 登录') : '游客登录'}
+            </h1>
+
+            {mode === 'account' ? (
+              <>
+                {signedIn && (
+                  <div className="login-account">
+                    <UserAvatar
+                      name={account.username || account.email}
+                      sources={account.avatarUrl ? [account.avatarUrl] : []}
+                      colorKey={account.username || account.email}
+                      className="account-avatar"
+                      label={`${account.username} 的头像`}
+                    />
+                    <div className="login-account-id">
+                      <span className="login-account-name">{account.username || 'myTeamSpeak 账号'}</span>
+                      <span className="login-account-sub">{account.email || '已登录'}</span>
+                    </div>
+                    <div className="login-account-links">
+                      <button type="button" className="field-link" onClick={onAccountRefresh}>
+                        刷新
                       </button>
-                    ))}
+                      <button type="button" className="field-link" onClick={onAccountLogout}>
+                        切换账号
+                      </button>
+                    </div>
                   </div>
                 )}
-              </div>
-            </>
-          )}
+
+                {!signedIn && (
+                  <>
+                    <div className="login-field">
+                      <Input
+                        id="account-email"
+                        size="large"
+                        style={inputStyle}
+                        prefix={<IconUser />}
+                        placeholder="请输入账号"
+                        value={accountEmail}
+                        onChange={setAccountEmail}
+                        onEnterPress={submitLogin}
+                        disabled={accountBusy || loggingIn}
+                      />
+                    </div>
+                    <div className="login-field">
+                      <Input
+                        id="account-password"
+                        size="large"
+                        style={inputStyle}
+                        prefix={<IconLock />}
+                        type={showAccountPassword ? 'text' : 'password'}
+                        placeholder="请输入密码"
+                        value={accountPassword}
+                        onChange={setAccountPassword}
+                        onEnterPress={submitLogin}
+                        onFocus={peek}
+                        onBlur={uncover}
+                        disabled={accountBusy || loggingIn}
+                        suffix={
+                          <RevealButton
+                            shown={showAccountPassword}
+                            onToggle={() => setShowAccountPassword((v) => !v)}
+                          />
+                        }
+                      />
+                    </div>
+                    <div className="login-field">{gatewayTokenField}</div>
+
+                    {showOtp ? (
+                      <div className="login-field">
+                        <Input
+                          id="account-otp"
+                          size="large"
+                          style={inputStyle}
+                          prefix={<IconKey />}
+                          placeholder="两步验证码"
+                          value={otp}
+                          onChange={setOtp}
+                          onEnterPress={submitLogin}
+                          onFocus={peek}
+                          onBlur={uncover}
+                          disabled={accountBusy || loggingIn}
+                          maxLength={64}
+                        />
+                      </div>
+                    ) : (
+                      <button type="button" className="field-link login-otp-link" onClick={() => setShowOtp(true)}>
+                        账号开启了两步验证？
+                      </button>
+                    )}
+
+                    <label className="login-remember">
+                      <input
+                        type="checkbox"
+                        checked={remember}
+                        onChange={(e) => toggleRemember(e.target.checked)}
+                      />
+                      <span>记住密码</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      className="login-submit"
+                      disabled={!canLogin || loggingIn}
+                      onClick={submitLogin}
+                    >
+                      {loggingIn ? '正在登录…' : '登录'}
+                    </button>
+                  </>
+                )}
+
+                {signedIn && (
+                  <>
+                    <div className="login-bookmarks">
+                      <div className="login-bookmarks-head">
+                        <span>云书签</span>
+                        <span className="login-bookmarks-count">
+                          {bookmarks.loading ? '同步中…' : `${bookmarks.items.length} 个`}
+                        </span>
+                      </div>
+                      {bookmarks.error ? (
+                        <span className="field-error">{accountErrorText(bookmarks.error)}</span>
+                      ) : bookmarks.items.length === 0 && !bookmarks.loading ? (
+                        <span className="login-hint">这个账号还没有保存服务器书签。</span>
+                      ) : (
+                        <div className="saved-list">
+                          {bookmarks.items.map((bookmark) => (
+                            <button
+                              key={bookmark.id}
+                              type="button"
+                              className="saved-item"
+                              onClick={() => applyBookmark(bookmark)}
+                              title={`填入 ${bookmark.address}`}
+                            >
+                              <IconServer size="small" />
+                              <span className="saved-main">
+                                <span className="saved-name">{bookmark.name || bookmark.address}</span>
+                                <span className="saved-sub">{bookmark.address}</span>
+                              </span>
+                              {bookmark.password && (
+                                <span className="saved-key" title="云书签里有服务器密码，填入后自动使用">
+                                  <IconKey size="small" />
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="login-field">{addressField}</div>
+                    <div className="login-field">{middlePasswordField}</div>
+
+                    <button
+                      type="button"
+                      className="login-submit"
+                      disabled={!canConnect || connecting}
+                      onClick={submit}
+                    >
+                      {connecting ? '正在进入服务器…' : `以 ${account.username || account.email} 身份进入服务器`}
+                    </button>
+                  </>
+                )}
+
+              </>
+            ) : (
+              <>
+                <div className="login-field">
+                  <Input
+                    id="nick"
+                    size="large"
+                    style={inputStyle}
+                    prefix={
+                      <UserAvatar
+                        name={nick || 'W'}
+                        sources={signedIn && account.avatarUrl ? [account.avatarUrl] : []}
+                        colorKey={signedIn ? account.username || 'me' : 'me'}
+                        style={{ width: 24, height: 24, borderRadius: 12, background: '#00b42a' }}
+                      />
+                    }
+                    placeholder="别人看到的名字"
+                    value={nick}
+                    onChange={setNickname}
+                    onEnterPress={submit}
+                    maxLength={30}
+                    disabled={!!accountNick}
+                  />
+                  {!!accountNick && <span className="login-hint">已登录 myTeamSpeak，将以账号名进入</span>}
+                </div>
+
+                <div className="login-field">{addressField}</div>
+                <div className="login-field">{passwordField}</div>
+                {tokenField}
+
+                <button type="button" className="login-submit" disabled={!canConnect || connecting} onClick={submit}>
+                  {connecting ? '正在连接…' : '以游客身份进入'}
+                </button>
+              </>
+            )}
+
+            <label className="login-agree">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => {
+                  agreedOnce = e.target.checked;
+                  setAgreed(e.target.checked);
+                }}
+              />
+              <span>
+                我已阅读并同意 <b>用户服务协议</b> 和 <b>隐私政策</b>
+              </span>
+            </label>
+
+            {mode === 'guest' && recentBlock}
+
+            {mode === 'account' && (
+              <>
+                <div className="login-others">
+                  <span className="login-others-line" />
+                  <span className="login-others-text">其他登录方式</span>
+                  <span className="login-others-line" />
+                </div>
+                <div className="login-socials">
+                  {SOCIALS.map((social) => (
+                    <button
+                      key={social.id}
+                      type="button"
+                      className="login-social"
+                      onClick={() => Toast.info({ content: '该功能正在开发中，敬请期待', duration: 2.5 })}
+                    >
+                      {social.icon}
+                      {social.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </section>
 
-        <div className="field">
-          <label className="field-label" htmlFor="addr">
-            服务器地址
-          </label>
-          <Input
-            id="addr"
-            size="large"
-            style={inputStyle}
-            prefix={<IconGlobe />}
-            placeholder="例如 pi.animal26.site 或 1.2.3.4:9987"
-            value={address}
-            onChange={setAddress}
-            onEnterPress={submit}
-            showClear
-          />
-          {address && !parsed ? (
-            <span className="field-error">地址看不懂，端口要 1–65535</span>
-          ) : (
-            <span className="field-help">不带端口就是默认的 9987</span>
-          )}
-        </div>
-
-        <div className="field">
-          <label className="field-label" htmlFor="nick">
-            你的昵称
-          </label>
-          <Input
-            id="nick"
-            size="large"
-            style={inputStyle}
-            prefix={
-              <UserAvatar
-                name={nick || 'W'}
-                sources={signedIn && account.avatarUrl ? [account.avatarUrl] : []}
-                colorKey={signedIn ? account.username || 'me' : 'me'}
-                style={{ width: 24, height: 24 }}
-              />
-            }
-            placeholder="别人看到的名字"
-            value={nick}
-            onChange={setNickname}
-            onEnterPress={submit}
-            maxLength={30}
-            disabled={!!accountNick}
-          />
-          {!!accountNick && (
-            <span className="field-help">已登录 myTeamSpeak，将以账号名进入；要自定义昵称请先退出账号</span>
-          )}
-        </div>
-
-        {passwordOpen ? (
-          <div className="field">
-            <label className="field-label" htmlFor="pwd">
-              服务器密码
-            </label>
-            <Input
-              id="pwd"
-              size="large"
-              style={inputStyle}
-              prefix={<IconKey />}
-              type={showPassword ? 'text' : 'password'}
-              placeholder="不是 TeamSpeak 账号密码"
-              value={password}
-              onChange={setPassword}
-              onEnterPress={submit}
-              suffix={
-                <button
-                  type="button"
-                  className="field-link"
-                  onClick={() => setShowPassword((v) => !v)}
-                >
-                  {showPassword ? '隐藏' : '显示'}
-                </button>
-              }
-            />
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="field-link"
-            onClick={() => setPasswordOpen(true)}
-          >
-            <IconKey size="small" />
-            服务器有密码？点这里填写
-          </button>
-        )}
-
-        {tokenNeeded && (
-          <div className="field">
-            <label className="field-label" htmlFor="token">
-              访问口令
-            </label>
-            <Input
-              id="token"
-              size="large"
-              style={inputStyle}
-              prefix={<IconServer />}
-              placeholder="站主给你的访问口令"
-              value={token}
-              onChange={onTokenChange}
-              onEnterPress={submit}
-            />
-            <span className="field-help">口令只存在这台浏览器里</span>
-          </div>
-        )}
-
-        <button
-          type="button"
-          className="connect-submit"
-          disabled={!canConnect || connecting}
-          onClick={submit}
-        >
-          {connecting ? '正在连接…' : signedIn ? `以 ${nick} 进入服务器` : '以游客身份进入'}
-        </button>
-
-        {signedIn && (
-          <span className="field-help">
-            登录状态下连接会携带 myTeamSpeak 身份；要完全匿名进入，请先退出账号。
-          </span>
-        )}
-
-        {recent.length > 0 && (
-          <>
-            <div className="divider" />
-            <div className="recent">
-              <span className="recent-label">最近连过</span>
-              <div className="recent-list">
-                {recent.map((r) => (
-                  <button key={r} type="button" className="recent-item" onClick={() => setAddress(r)}>
-                    <IconServer size="small" />
-                    <span>{r}</span>
-                  </button>
-                ))}
-              </div>
+        <aside className="login-brand-side">
+          <PeekGuard guard={hiding} />
+          <div className="login-brand">
+            <img className="brand-mark" src="/icons/icon-96.png" alt="" aria-hidden="true" />
+            <div className="brand-text">
+              <span className="brand-name">回响</span>
+              <span className="brand-sub">网页版 · 不必安装，推门即入</span>
             </div>
-          </>
-        )}
+            <span className="login-brand-hint" aria-live="polite">
+              {hiding ? '嘘，我们不看' : '眼睛会跟着你'}
+            </span>
+          </div>
+        </aside>
       </div>
     </div>
   );
