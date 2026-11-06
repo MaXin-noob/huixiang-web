@@ -1,0 +1,14 @@
+# 依赖与构建产物
+client/node_modules/
+client/dist/
+client/tsconfig.tsbuildinfo
+gateway/build/
+gateway/.gradle/
+gateway/.kotlin/
+.gradle/
+build/
+*.log
+
+# 系统
+.DS_Store
+Thumbs.db
