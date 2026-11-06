@@ -200,7 +200,7 @@ export default function Stage({
 
           if (!manageable) return tile;
           return (
-            <Dropdown key={`${m.uid}-${m.id}`} trigger="contextMenu" position="bottomLeft" menu={memberMenu(m)}>
+            <Dropdown key={`${m.uid}-${m.id}`} trigger="contextMenu" position="bottomLeft" clickToHide menu={memberMenu(m)}>
               {tile}
             </Dropdown>
           );

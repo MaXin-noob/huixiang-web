@@ -138,7 +138,7 @@ export default function ConnectPage({
     onAccountLogin(accountEmail.trim(), accountPassword, otp.trim());
   };
 
-  const useBookmark = (bookmark: Bookmark) => {
+  const applyBookmark = (bookmark: Bookmark) => {
     setAddress(bookmark.address);
     setNickname(bookmark.nickname.trim() || account.username || nickname);
     setPassword(bookmark.password);
@@ -316,7 +316,7 @@ export default function ConnectPage({
                         key={bookmark.id}
                         type="button"
                         className="saved-item"
-                        onClick={() => useBookmark(bookmark)}
+                        onClick={() => applyBookmark(bookmark)}
                         title={`填入 ${bookmark.address}`}
                       >
                         <IconServer size="small" />

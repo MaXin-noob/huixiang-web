@@ -97,7 +97,8 @@ function PersonRow({
   return (
     <Dropdown
       trigger="contextMenu"
-      position="bottomLeft"
+      position="rightTop"
+      clickToHide
       menu={[
         ...(onKick ? [{ node: 'item' as const, name: '踢出成员', onClick: () => onKick(member) }] : []),
         ...(onBan
@@ -224,7 +225,12 @@ export default function ChannelTree({
             {channel.password && <IconLock size="small" className="chan-lock" />}
             {people.length > 0 && <span className="chan-count">{people.length}</span>}
             <span className="chan-more" onClick={(e) => e.stopPropagation()}>
-              <Dropdown trigger="click" position="bottomRight" menu={menuFor(channel)}>
+              <Dropdown
+                trigger="click"
+                position="rightTop"
+                clickToHide
+                menu={menuFor(channel)}
+              >
                 <button type="button" className="chan-more-btn" aria-label="频道操作">
                   <IconMore size="small" />
                 </button>
@@ -235,7 +241,12 @@ export default function ChannelTree({
 
         return (
           <div key={channel.id}>
-            <Dropdown trigger="contextMenu" position="bottomLeft" menu={menuFor(channel)}>
+            <Dropdown
+              trigger="contextMenu"
+              position="rightTop"
+              clickToHide
+              menu={menuFor(channel)}
+            >
               {rowNode}
             </Dropdown>
 

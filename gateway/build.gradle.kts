@@ -35,7 +35,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("site.huixiang.web.GatewayKt")
+    mainClass.set("web.GatewayKt")
 }
 
 tasks.test {
