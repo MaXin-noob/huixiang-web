@@ -620,6 +620,50 @@ body {
   color: var(--text-4);
 }
 
+/* ====== 频道拖拽排序 ====== */
+
+/* 每行整块的定位基准：插入指示线用绝对定位贴在块的上/下沿 */
+.rail-chan {
+  position: relative;
+}
+
+.rail-chan.drop-before::before,
+.rail-chan.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--brand);
+  box-shadow: 0 0 0 2px var(--brand-soft);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.rail-chan.drop-before::before {
+  top: -1px;
+}
+
+.rail-chan.drop-after::after {
+  bottom: -1px;
+}
+
+/* 正在被拖走的那一块 */
+.rail-chan.is-dragging {
+  opacity: 0.4;
+}
+
+.chan-row[draggable='true'],
+.chan-spacer[draggable='true'] {
+  cursor: grab;
+}
+
+.chan-row[draggable='true']:active,
+.chan-spacer[draggable='true']:active {
+  cursor: grabbing;
+}
+
 .chan-on {
   background: var(--brand-soft);
   color: var(--brand-deep);

@@ -74,6 +74,8 @@ Android 应用的版本记录在仓库根目录的 [CHANGELOG.md](../CHANGELOG.m
 - 新增频道成员进出提示：有人进入或离开**我所在频道**时，右下角弹出轻提示并播放对应音效（进场/离场用不同音高，Web Audio 实时合成，不引入音频文件）。只关注自己所在频道；首次进服、或自己切换频道时只重置成员基线而不误报，自己进出也不提示；多人同时进出会合并成一句。该功能默认开启、常驻，不提供开关。新增 `presence.ts`（成员 diff）、`audio/cues.ts`（提示音）、`components/PresenceToasts.tsx`（提示条）与端到端脚本 `test/e2e-presence.mjs`（headless 浏览器进服 + 脚本客户端进出同频道，抓取提示并截图）。
 - 支持 PWA 安装：新增 `web/client/public/sw.js`（壳资源预缓存；导航请求网络优先、失败回退缓存的 index.html；静态资源 stale-while-revalidate；`/ws`、`/files`、`/auth`、`/account`、`/avatar`、`/server-banner`、`/cloud-avatar` 一律放行不缓存），`src/main.tsx` 在生产构建下注册 Service Worker（dev 不注册，避免缓存开发资源）。配合已有 `manifest.webmanifest` 与全套图标即可安装到桌面/手机主屏；断网能打开外壳再提示需联网，实时语音/文件仍走网络。
 
+- 支持频道拖拽排序：频道树里直接拖起某行，拖到目标行的上半区插到其前、下半区插到其后，蓝色指示线实时标出落点。同一父级下即纯排序（复用 `onReorderChannel` → `channeledit channel_order`）；拖到别的父级的行上则把频道移到该父级并插到对应位置（带上新 `parent`，网关发 `channelmove`）。拖到自己或自己的子频道上会被拒绝（防止成环），落点与原位置一致时不发命令，分隔符频道同样可拖、可作落点。`ChannelTree.tsx` 新增拖拽状态与落点计算，`ServerPage` 的 `onReorderChannel` 增加可选 `parent` 参数，右键「上移 / 下移」保留。
+
 ### 部署（web/deploy）
 
 - 网关改为**独立 Gradle 构建**（`web/gateway/settings.gradle.kts`，直接引 `tsproto` 源码），不再加入主工程：服务器上不需要 Android SDK，Docker 镜像也不必复制整个 `app/`。
