@@ -3,6 +3,7 @@
 
 import workletUrl from './capture-worklet.js?url';
 import { DEFAULT_GAIN, clampGain } from './gain';
+import { createAudioContext } from './context';
 import type { MicMode } from '../protocol';
 
 /** 自动模式的门限：一帧的 RMS 超过它就算在说话。 */
@@ -10,8 +11,14 @@ export const VAD_THRESHOLD = 0.015;
 /** 说完之后的尾音：这段时间内还继续发，避免句子中间的字被切掉。 */
 export const VAD_TAIL_MS = 600;
 
-const AudioEncoderCtor: any = (globalThis as any).AudioEncoder;
-const AudioDataCtor: any = (globalThis as any).AudioData;
+// WebCodecs 在 lib.dom 里已有类型声明，但运行时不一定存在（旧版 Safari、非安全上下文等），
+// 所以按「可能缺失的构造器」取用，由 micCodecAvailable() 和 start() 里的守卫兜住。
+const AudioEncoderCtor: typeof AudioEncoder | undefined = (
+  globalThis as Record<string, unknown>
+).AudioEncoder as typeof AudioEncoder | undefined;
+const AudioDataCtor: typeof AudioData | undefined = (
+  globalThis as Record<string, unknown>
+).AudioData as typeof AudioData | undefined;
 
 export const micCodecAvailable = () => !!AudioEncoderCtor && !!AudioDataCtor;
 
@@ -19,7 +26,7 @@ export class MicSender {
   private ctx: AudioContext | null = null;
   private stream: MediaStream | null = null;
   private node: AudioWorkletNode | null = null;
-  private encoder: any = null;
+  private encoder: AudioEncoder | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
   /** 采集增益：在源和工作节点之间，改的是编码前的 PCM。 */
   private input: GainNode | null = null;
@@ -37,6 +44,14 @@ export class MicSender {
   async start(onFrame: (opus: Uint8Array) => void, onLevel?: (level: number) => void): Promise<void> {
     this.stop();
 
+    // 调用方一般先问过 micCodecAvailable()，这里再兜一次：缺 API 时给个明确说法，
+    // 顺便把构造器收窄成非 undefined，后面闭包里也能直接用。
+    const Encoder = AudioEncoderCtor;
+    const AudioDataImpl = AudioDataCtor;
+    if (!Encoder || !AudioDataImpl) {
+      throw new Error('当前浏览器不支持 WebCodecs 音频编码');
+    }
+
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         channelCount: 1,
@@ -46,8 +61,7 @@ export class MicSender {
       },
     });
 
-    const Ctx: any = (globalThis as any).AudioContext;
-    const ctx: AudioContext = new Ctx({ sampleRate: 48000, latencyHint: 'interactive' });
+    const ctx = createAudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
     this.ctx = ctx;
     await ctx.audioWorklet.addModule(workletUrl);
 
@@ -63,8 +77,8 @@ export class MicSender {
     this.node.connect(this.sink);
     this.sink.connect(ctx.destination);
 
-    this.encoder = new AudioEncoderCtor({
-      output: (chunk: any) => {
+    this.encoder = new Encoder({
+      output: (chunk: EncodedAudioChunk) => {
         const bytes = new Uint8Array(chunk.byteLength);
         chunk.copyTo(bytes);
         onFrame(bytes);
@@ -104,7 +118,7 @@ export class MicSender {
       if (onLevel) onLevel(peak);
       if (!this.transmitting) return;
       try {
-        const data = new AudioDataCtor({
+        const data = new AudioDataImpl({
           format: 's16',
           sampleRate: 48000,
           numberOfFrames: 960,
@@ -112,7 +126,7 @@ export class MicSender {
           timestamp: this.ts,
           data: pcm,
         });
-        this.encoder.encode(data);
+        this.encoder?.encode(data);
         data.close();
         this.ts += 20_000;
       } catch {

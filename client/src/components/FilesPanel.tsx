@@ -88,8 +88,12 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
   }, [cid]);
 
   useEffect(() => {
+    // 数组只 push 不重建，所以这里拿到的一直是同一个引用；
+    // 复制一份变量是为了让依赖检查看得清「卸载时清理的就是这批 timer」。
+    const pending = timers.current;
     return () => {
-      for (const t of timers.current) window.clearTimeout(t);
+      for (const t of pending) window.clearTimeout(t);
+      pending.length = 0;
     };
   }, []);
 
@@ -103,6 +107,9 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
   /** 完成和失败的行留一会儿再消失，好让人看见结果而不是闪一下就没了。 */
   const fadeLater = useCallback((id: string) => {
     const timer = window.setTimeout(() => {
+      // 到点就从待清理名单里摘掉，免得长开面板时句柄越攒越多
+      const i = timers.current.indexOf(timer);
+      if (i >= 0) timers.current.splice(i, 1);
       setTransfers((prev) => prev.filter((t) => t.id !== id));
     }, 4000);
     timers.current.push(timer);

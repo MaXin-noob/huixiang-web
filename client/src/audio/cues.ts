@@ -4,13 +4,14 @@
 // 浏览器要求「用户手势」之后才允许出声，所以 AudioContext 懒创建；进服/点按钮
 // 本身已经是一次手势，通常能正常播放。若仍是 suspended，就尝试 resume，失败静默。
 
+import { AudioContextCtor } from './context';
+
 let ctx: AudioContext | null = null;
 
 function ensureCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   if (!ctx) {
-    const Ctor: typeof AudioContext | undefined =
-      (window as any).AudioContext ?? (window as any).webkitAudioContext;
+    const Ctor = AudioContextCtor;
     if (!Ctor) return null;
     ctx = new Ctor();
   }

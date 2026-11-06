@@ -2,9 +2,16 @@
 // 每个人一个解码器和一个播放队列——TS 的语音包是先解压再混的，混在一起解会把时间戳搞乱。
 
 import { DEFAULT_GAIN, clampGain } from './gain';
+import { createAudioContext } from './context';
 
-const AudioDecoderCtor: any = (globalThis as any).AudioDecoder;
-const EncodedAudioChunkCtor: any = (globalThis as any).EncodedAudioChunk;
+// WebCodecs 在 lib.dom 里已有类型声明，但运行时不一定存在（旧版 Safari、非安全上下文等），
+// 所以按「可能缺失的构造器」取用，由 webCodecsAvailable() 和 play() 里的守卫兜住。
+const AudioDecoderCtor: typeof AudioDecoder | undefined = (
+  globalThis as Record<string, unknown>
+).AudioDecoder as typeof AudioDecoder | undefined;
+const EncodedAudioChunkCtor: typeof EncodedAudioChunk | undefined = (
+  globalThis as Record<string, unknown>
+).EncodedAudioChunk as typeof EncodedAudioChunk | undefined;
 
 /** OpusHead（19 字节）：WebCodecs 的 opus 解码器要这个 description 才肯工作。 */
 const OPUS_HEAD = new Uint8Array([
@@ -20,7 +27,7 @@ const OPUS_HEAD = new Uint8Array([
 export const webCodecsAvailable = () => !!AudioDecoderCtor && !!EncodedAudioChunkCtor;
 
 interface Person {
-  decoder: any;
+  decoder: AudioDecoder;
   gain: GainNode;
   /** 下一次该在什么时候播（AudioContext 时间轴）。 */
   next: number;
@@ -38,8 +45,7 @@ export class VoicePlayer {
   private broken = false;
 
   constructor(private readonly onLevel?: (clientId: number, level: number) => void) {
-    const Ctx: any = (globalThis as any).AudioContext ?? (globalThis as any).webkitAudioContext;
-    this.ctx = new Ctx({ sampleRate: 48000, latencyHint: 'interactive' });
+    this.ctx = createAudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
     this.master = this.ctx.createGain();
     this.master.connect(this.ctx.destination);
   }
@@ -82,15 +88,17 @@ export class VoicePlayer {
 
   /** 一帧 Opus。空帧表示这个人停止说话了。 */
   play(clientId: number, codec: number, opus: Uint8Array) {
-    if (this.broken || !webCodecsAvailable()) return;
+    if (this.broken) return;
     if (opus.length === 0) return;
+    const Chunk = EncodedAudioChunkCtor;
+    if (!Chunk || !AudioDecoderCtor) return;
 
     const p = this.person(clientId, codec);
     if (!p) return;
 
     try {
       p.decoder.decode(
-        new EncodedAudioChunkCtor({
+        new Chunk({
           type: 'key',
           timestamp: p.ts,
           duration: 20000,
@@ -120,10 +128,13 @@ export class VoicePlayer {
     gain.gain.value = this.volumes.get(clientId) ?? DEFAULT_GAIN;
     gain.connect(this.master);
 
-    let decoder: any;
+    const Decoder = AudioDecoderCtor;
+    if (!Decoder) return null;
+
+    let decoder: AudioDecoder;
     try {
-      decoder = new AudioDecoderCtor({
-        output: (data: any) => this.render(data, clientId),
+      decoder = new Decoder({
+        output: (data: AudioData) => this.render(data, clientId),
         error: () => this.dispose(clientId),
       });
       decoder.configure({
@@ -143,16 +154,16 @@ export class VoicePlayer {
   }
 
   /** 解码好了：拷成 AudioBuffer，按时间排在上一帧后面。 */
-  private render(data: any, clientId: number) {
+  private render(data: AudioData, clientId: number) {
     const p = this.people.get(clientId);
     if (!p) {
       data.close();
       return;
     }
     try {
-      const frames = data.numberOfFrames as number;
-      const channels = data.numberOfChannels as number;
-      const rate = data.sampleRate as number;
+      const frames = data.numberOfFrames;
+      const channels = data.numberOfChannels;
+      const rate = data.sampleRate;
       const buffer = this.ctx.createBuffer(channels, frames, rate);
       let peak = 0;
       for (let c = 0; c < channels; c++) {
