@@ -564,7 +564,9 @@ export default function ServerPage({
               onCreateChannel={openCreateChannel}
               onEditChannel={openEditChannel}
               onDeleteChannel={setDeleteTarget}
-              onReorderChannel={(channel, after) => onEditChannel(channel.id, { after })}
+              onReorderChannel={(channel, after, parent) =>
+                onEditChannel(channel.id, parent != null && parent !== channel.parent ? { parent, after } : { after })
+              }
               avatarToken={avatarToken}
               onKick={setKickTarget}
               onBan={setBanTarget}

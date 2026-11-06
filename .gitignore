@@ -9,6 +9,9 @@ gateway/.kotlin/
 build/
 *.log
 
+# 本地约定文件（不随仓库分发）
+AGENTS.md
+
 # 系统
 .DS_Store
 Thumbs.db
