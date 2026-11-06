@@ -364,23 +364,6 @@ export default function ConnectPage({
     </>
   );
 
-  const passwordField = (
-    <Input
-      id="pwd"
-      size="large"
-      style={inputStyle}
-      prefix={<IconKey />}
-      type={showPassword ? 'text' : 'password'}
-      placeholder="请输入服务器口令"
-      value={password}
-      onChange={setPassword}
-      onEnterPress={submit}
-      onFocus={peek}
-      onBlur={uncover}
-      suffix={<RevealButton shown={showPassword} onToggle={() => setShowPassword((v) => !v)} />}
-    />
-  );
-
   const middlePasswordField = (
     <Input
       id="server-pwd"
@@ -425,14 +408,17 @@ export default function ConnectPage({
         size="large"
         style={inputStyle}
         prefix={<IconServer />}
-        placeholder="站主给的访问口令"
+        placeholder="请输入网关访问口令"
         value={token}
-        onChange={onTokenChange}
+        onChange={(v) => {
+          // 和登录页一样：站主定死的口令填一次就留在本地，下次打开直接带出来
+          onTokenChange(v);
+          store.setToken(v);
+        }}
         onEnterPress={submit}
         onFocus={peek}
         onBlur={uncover}
       />
-      <span className="login-hint">口令只存在这台浏览器里</span>
     </div>
   ) : null;
 
@@ -660,14 +646,7 @@ export default function ConnectPage({
                     id="nick"
                     size="large"
                     style={inputStyle}
-                    prefix={
-                      <UserAvatar
-                        name={nick || 'W'}
-                        sources={signedIn && account.avatarUrl ? [account.avatarUrl] : []}
-                        colorKey={signedIn ? account.username || 'me' : 'me'}
-                        style={{ width: 24, height: 24, borderRadius: 12, background: '#00b42a' }}
-                      />
-                    }
+                    prefix={<IconUser />}
                     placeholder="别人看到的名字"
                     value={nick}
                     onChange={setNickname}
@@ -679,7 +658,7 @@ export default function ConnectPage({
                 </div>
 
                 <div className="login-field">{addressField}</div>
-                <div className="login-field">{passwordField}</div>
+                <div className="login-field">{middlePasswordField}</div>
                 {tokenField}
 
                 <button type="button" className="login-submit" disabled={!canConnect || connecting} onClick={submit}>
