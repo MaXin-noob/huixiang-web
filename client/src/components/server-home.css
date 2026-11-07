@@ -615,6 +615,15 @@
   vertical-align: middle;
 }
 
+/* 首字母回退头像：背景/字号只能落在内层 .semi-avatar 上，避免 Semi wrapper 出现方形色块 */
+.sh-avatar-semi.sh-avatar-fb {
+  background: var(--sh-avatar-bg, rgba(var(--semi-grey-5), 1));
+}
+
+.sh-avatar-semi.sh-avatar-fb .semi-avatar-label {
+  font-size: var(--sh-avatar-fs, 14px);
+}
+
 /* 小尺寸头像上的直播角标：默认档位字太小（6px），这里放大到可读 */
 .sh-avatar-semi .semi-avatar-top_slot-content {
   font-size: 9px;
@@ -850,8 +859,17 @@
   white-space: pre-wrap;
 }
 
+/* 纯表情消息：大号渲染（对齐 TS 客户端） */
+.sh-msg-emoji {
+  font-size: 34px;
+  line-height: 1.25;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* 输入区 */
 .sh-composer {
+  position: relative;
   flex: 0 0 auto;
   padding: 12px 24px 18px 24px;
 }
@@ -939,6 +957,46 @@
   background: #f4f5f7;
   color: #c2c7d0;
   cursor: default;
+}
+
+/* 表情选择器（点输入区表情按钮弹出） */
+.sh-emoji-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.sh-emoji-picker {
+  position: absolute;
+  left: 24px;
+  bottom: calc(100% - 4px);
+  z-index: 31;
+  width: 340px;
+  max-height: 262px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  padding: 8px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid var(--sh-line);
+  box-shadow: 0 12px 32px rgba(21, 23, 28, 0.18);
+}
+
+.sh-emoji-item {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 6px 0;
+  border-radius: 8px;
+  transition: background 0.12s ease;
+}
+
+.sh-emoji-item:hover {
+  background: var(--sh-field);
 }
 
 /* 更多弹窗 · 服务器信息（对齐设计稿 19:67） */

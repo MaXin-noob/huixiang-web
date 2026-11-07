@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Avatar as SemiAvatar, AIChatDialogue, Dropdown, Popover, SideSheet, Switch, Toast } from '@douyinfe/semi-ui';
 import {
   IconMore,
@@ -46,6 +46,7 @@ import {
   type State,
 } from '../protocol';
 import { avatarColor, avatarSources, initial } from '../ui';
+import { convertShortcodes, isEmojiOnly, EMOJI_LIST } from '../emoji';
 import { gainPercent } from '../audio/gain';
 import VolumePopover from './VolumePopover';
 import AwayPopover from './AwayPopover';
@@ -282,18 +283,22 @@ function Avatar({
       />
     );
   }
+  // 注意：Semi 在存在 border/topSlot/bottomSlot 时会把 style 同时铺到外层 wrapper 和
+  // 定位 div 上；若把 background 放进 style，就会在圆形头像后面多出一块方形色块。
+  // 因此背景与字号改用 CSS 变量交给内层 .sh-avatar-fb 处理。
+  const fallbackStyle = {
+    width: size,
+    height: size,
+    flex: '0 0 auto',
+    '--sh-avatar-bg': avatarColor(id),
+    '--sh-avatar-fs': `${Math.round(size * 0.42)}px`,
+  } as CSSProperties;
   return (
     <SemiAvatar
       alt={name}
       size={sizeTier}
-      className="sh-avatar-semi"
-      style={{
-        width: size,
-        height: size,
-        flex: '0 0 auto',
-        background: avatarColor(id),
-        fontSize: Math.round(size * 0.42),
-      }}
+      className="sh-avatar-semi sh-avatar-fb"
+      style={fallbackStyle}
       {...liveProps}
     >
       {initial(name)}
@@ -418,8 +423,27 @@ export default function ServerHome(props: Props) {
   const [filesOpen, setFilesOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const dlgRef = useRef<AIChatDialogue | null>(null);
+
+  /** 在光标处插入一个 emoji，并把焦点/光标落回原位置之后。 */
+  const insertEmoji = (ch: string) => {
+    const el = inputRef.current;
+    const start = el?.selectionStart ?? draft.length;
+    const end = el?.selectionEnd ?? draft.length;
+    const next = draft.slice(0, start) + ch + draft.slice(end);
+    setDraft(next);
+    setEmojiOpen(false);
+    requestAnimationFrame(() => {
+      const node = inputRef.current;
+      if (!node) return;
+      node.focus();
+      const pos = start + ch.length;
+      node.setSelectionRange(pos, pos);
+    });
+  };
 
   // 聊天记录 → AIChatDialogue 消息；id 同时用于反查原始 ChatLine（头像/昵称/时间/直播态）。
   const aiChats = useMemo(
@@ -428,7 +452,7 @@ export default function ServerHome(props: Props) {
         id: `${line.time}-${line.from}-${i}`,
         role: 'user',
         name: line.name,
-        content: line.text,
+        content: convertShortcodes(line.text),
         createdAt: line.time * 1000,
       })),
     [chat],
@@ -625,10 +649,12 @@ export default function ServerHome(props: Props) {
   };
 
   const send = () => {
-    const text = draft.trim();
+    // 先把 `:blush:` 这类短码转成 emoji，再发送；纯空白不发送。
+    const text = convertShortcodes(draft).trim();
     if (!text || !connected) return;
     onSay(text);
     setDraft('');
+    setEmojiOpen(false);
   };
 
   /** 好友/云聊天入口：按钮一直显示；访客点击提示需登录 myTeamSpeak 账号。 */
@@ -1321,6 +1347,16 @@ export default function ServerHome(props: Props) {
                         </div>
                       );
                     },
+                    renderDialogueContent: ({ message, defaultContent }) => {
+                      const line = message ? aiLineById.get(String(message.id)) : undefined;
+                      if (!line) return defaultContent;
+                      const text = convertShortcodes(line.text);
+                      // 纯表情消息（1~3 个 emoji）按大号渲染，其余沿用默认（Markdown）渲染。
+                      if (isEmojiOnly(text)) {
+                        return <div className="sh-msg-emoji">{text.trim()}</div>;
+                      }
+                      return defaultContent;
+                    },
                     renderDialogueAction: () => null,
                   }}
                 />
@@ -1330,8 +1366,28 @@ export default function ServerHome(props: Props) {
         </div>
 
         <div className="sh-composer">
+          {emojiOpen && (
+            <>
+              <div className="sh-emoji-backdrop" onClick={() => setEmojiOpen(false)} />
+              <div className="sh-emoji-picker" role="dialog" aria-label="选择表情">
+                {EMOJI_LIST.map((e) => (
+                  <button
+                    key={e.name}
+                    type="button"
+                    className="sh-emoji-item"
+                    title={`:${e.name}:`}
+                    aria-label={e.name}
+                    onClick={() => insertEmoji(e.char)}
+                  >
+                    {e.char}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <div className="sh-composer-box">
             <textarea
+              ref={inputRef}
               className="sh-composer-input"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -1346,13 +1402,32 @@ export default function ServerHome(props: Props) {
               rows={1}
             />
             <div className="sh-composer-tools">
-              <button className="sh-tool-btn" type="button" title="表情">
+              <button
+                className="sh-tool-btn"
+                type="button"
+                title="表情"
+                aria-label="表情"
+                aria-expanded={emojiOpen}
+                onClick={() => setEmojiOpen((v) => !v)}
+              >
                 <IcEmoji />
               </button>
-              <button className="sh-tool-btn" type="button" title="附件">
+              <button
+                className="sh-tool-btn"
+                type="button"
+                title="附件"
+                aria-label="附件"
+                onClick={() => Toast.info('该功能正在开发中')}
+              >
                 <IcClip />
               </button>
-              <button className="sh-tool-btn" type="button" title="图片">
+              <button
+                className="sh-tool-btn"
+                type="button"
+                title="图片"
+                aria-label="图片"
+                onClick={() => Toast.info('该功能正在开发中')}
+              >
                 <IcImage />
               </button>
               <span className="sh-composer-spacer" />
