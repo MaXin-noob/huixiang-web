@@ -33,6 +33,8 @@ export default function VolumePopover({ title, value, onChange, trigger = 'click
         <div className="vol-pop">
           <Slider
             className="vol-slider"
+            vertical
+            verticalReverse
             value={pct}
             min={0}
             max={200}

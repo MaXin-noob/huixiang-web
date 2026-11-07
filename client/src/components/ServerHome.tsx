@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Dropdown, Popover, SideSheet, Switch, Toast } from '@douyinfe/semi-ui';
+import { Avatar as SemiAvatar, AIChatDialogue, Dropdown, Popover, SideSheet, Switch, Toast } from '@douyinfe/semi-ui';
 import {
   IconMore,
+  IconEdit,
+  IconDelete,
+  IconCopy,
   IconPlus,
   IconMicrophone,
   IconMicrophoneOff,
@@ -27,7 +30,10 @@ import {
   flatten,
   memberKey,
   type AccountState,
+  type ChannelCreate,
+  type ChannelKind,
   type ChannelNode,
+  type ChannelPatch,
   type ChatLine,
   type CloudChat,
   type CloudState,
@@ -48,6 +54,13 @@ import ChannelIcon from './ChannelIcon';
 import FilesPanel from './FilesPanel';
 import FriendsPanel from './FriendsPanel';
 import './server-home.css';
+
+/** AIChatDialogue 的角色元数据：聊天记录里所有成员都按 user 角色渲染。 */
+const AI_ROLE_CONFIG = {
+  user: { name: '成员', color: 'grey' },
+  assistant: { name: '回响', color: 'blue' },
+  system: { name: '系统', color: 'grey' },
+} as const;
 
 interface Props {
   state: State;
@@ -139,6 +152,12 @@ interface Props {
   onWatch?: (clientId: number) => void;
   /** 停止观看。 */
   onStopWatch?: () => void;
+  /** 新建频道（网关 tsproto.ChannelEdits 已实现，权限由服务器判定）。 */
+  onCreateChannel?: (patch: ChannelCreate) => void;
+  /** 修改频道：只提交要改的字段。 */
+  onEditChannel?: (cid: number, patch: ChannelPatch) => void;
+  /** 删除频道（连同子频道，成员移到默认频道）。 */
+  onDeleteChannel?: (cid: number) => void;
   /**
    * 本期只接入 M1/M2 用到的字段；旧 ServerPage 传进来的其余字段（文件、串流、
    * 好友、云聊天、频道管理等）先照单接收，等后续里程碑逐个接上，避免一次性大改。
@@ -206,7 +225,18 @@ const IcImage = () => (
   </svg>
 );
 
-/** 头像：优先真实图片（账号 / 服务器 / myTeamSpeak），失败逐级回退到首字母色块。 */
+/** 直播头像装饰：粉色流光边框 + 顶部「直播」渐变角标（Semi Avatar 2.52+ 能力）。 */
+const LIVE_AVATAR_PROPS = {
+  border: { color: '#FE2C55', motion: true },
+  contentMotion: true,
+  topSlot: {
+    text: '直播',
+    gradientStart: 'rgb(255,23,100)',
+    gradientEnd: 'rgb(237,52,148)',
+  },
+} as const;
+
+/** 头像：优先真实图片（账号 / 服务器 / myTeamSpeak），失败逐级回退到首字母色块。底层用 Semi Avatar。 */
 function Avatar({
   id,
   name,
@@ -216,6 +246,7 @@ function Avatar({
   avatarToken,
   accountAvatar,
   size,
+  live = false,
 }: {
   id: number;
   name: string;
@@ -225,6 +256,8 @@ function Avatar({
   avatarToken: string;
   accountAvatar: string;
   size: number;
+  /** 该用户正在直播：显示 Semi 的粉色动效边框与「直播」角标。 */
+  live?: boolean;
 }) {
   const sources = useMemo(
     () => avatarSources({ id, avatar, myTeamSpeakAvatar }, ownId, accountAvatar, avatarToken),
@@ -232,25 +265,39 @@ function Avatar({
   );
   const [idx, setIdx] = useState(0);
   const src = sources[idx];
+  const liveProps = live ? LIVE_AVATAR_PROPS : {};
+  // Semi 的 topSlot/border 样式按 size 档位（24/32/40/48…）取值；像素尺寸用 style 覆盖，
+  // 但档位必须落在合法枚举里，否则角标没有宽高会缩成一个点。
+  const sizeTier = size <= 24 ? 'extra-small' : 'default';
   if (src) {
     return (
-      <div className="sh-avatar" style={{ width: size, height: size }}>
-        <img src={src} alt={name} onError={() => setIdx((i) => i + 1)} />
-      </div>
+      <SemiAvatar
+        alt={name}
+        src={src}
+        size={sizeTier}
+        className="sh-avatar-semi"
+        style={{ width: size, height: size, flex: '0 0 auto' }}
+        onError={() => setIdx((i) => i + 1)}
+        {...liveProps}
+      />
     );
   }
   return (
-    <div
-      className="sh-avatar"
+    <SemiAvatar
+      alt={name}
+      size={sizeTier}
+      className="sh-avatar-semi"
       style={{
         width: size,
         height: size,
+        flex: '0 0 auto',
         background: avatarColor(id),
         fontSize: Math.round(size * 0.42),
       }}
+      {...liveProps}
     >
       {initial(name)}
-    </div>
+    </SemiAvatar>
   );
 }
 
@@ -347,6 +394,9 @@ export default function ServerHome(props: Props) {
     onStopShare,
     onWatch,
     onStopWatch,
+    onCreateChannel,
+    onEditChannel,
+    onDeleteChannel,
   } = props;
 
   const connected = state.phase === 'connected';
@@ -361,10 +411,33 @@ export default function ServerHome(props: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pwChannel, setPwChannel] = useState<ChannelNode | null>(null);
   const [pwValue, setPwValue] = useState('');
+  // 频道管理：新建/编辑表单、删除确认、行内「更多」菜单。
+  const [chanDialog, setChanDialog] = useState<{ mode: 'create' | 'edit'; target: ChannelNode | null } | null>(null);
+  const [chanForm, setChanForm] = useState<ChanForm>(() => defaultChanForm());
+  const [deleteTarget, setDeleteTarget] = useState<ChannelNode | null>(null);
   const [filesOpen, setFilesOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const listRef = useRef<HTMLDivElement | null>(null);
+  const dlgRef = useRef<AIChatDialogue | null>(null);
+
+  // 聊天记录 → AIChatDialogue 消息；id 同时用于反查原始 ChatLine（头像/昵称/时间/直播态）。
+  const aiChats = useMemo(
+    () =>
+      chat.map((line, i) => ({
+        id: `${line.time}-${line.from}-${i}`,
+        role: 'user',
+        name: line.name,
+        content: line.text,
+        createdAt: line.time * 1000,
+      })),
+    [chat],
+  );
+  const aiLineById = useMemo(() => {
+    const m = new Map<string, ChatLine>();
+    chat.forEach((line, i) => m.set(`${line.time}-${line.from}-${i}`, line));
+    return m;
+  }, [chat]);
 
   // 一次性摊平整棵树：既保留父→子顺序，又方便过滤。
   const flat = useMemo(() => flatten(state.tree), [state.tree]);
@@ -400,11 +473,27 @@ export default function ServerHome(props: Props) {
     );
   }, [flat, q]);
 
-  // 新消息自动滚到底
+  // 新消息自动滚到底（AIChatDialogue 内部自己滚动）
   useEffect(() => {
-    const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    const el = dlgRef.current?.containerRef.current;
+    if (el) {
+      dlgRef.current?.scrollToBottom(false);
+      return;
+    }
+    const fallback = listRef.current;
+    if (fallback) fallback.scrollTop = fallback.scrollHeight;
   }, [chat.length]);
+
+  // AIChatDialogue 的列表滚动到顶部时继续加载更早的消息
+  useEffect(() => {
+    const el = dlgRef.current?.containerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (el.scrollTop < 40 && chatMore && !chatBusy) onLoadMoreChat();
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [chat.length, chatMore, chatBusy, onLoadMoreChat]);
 
   // 按住说话：仅在 ptt 模式下监听空格键。输入框里打空格要正常输入，故跳过可编辑元素。
   useEffect(() => {
@@ -459,6 +548,80 @@ export default function ServerHome(props: Props) {
     onJoinChannel(pwChannel.id, pwValue);
     setPwChannel(null);
     setPwValue('');
+  };
+
+  // —— 频道管理：新建 / 编辑 / 删除 ——
+  const openCreateChannel = (parent = 0) => {
+    setChanForm({ ...defaultChanForm(), parent });
+    setChanDialog({ mode: 'create', target: null });
+  };
+
+  const openEditChannel = (ch: ChannelNode) => {
+    setChanForm({
+      name: ch.display || ch.name,
+      description: ch.description ?? '',
+      parent: ch.parent,
+      kind: ch.kind ?? 'permanent',
+      password: ch.password,
+      newPassword: '',
+      codec: ch.codec ?? 4,
+      quality: ch.quality ?? 6,
+      maxClients: ch.maxClients ?? -1,
+    });
+    setChanDialog({ mode: 'edit', target: ch });
+  };
+
+  const submitChannel = () => {
+    const name = chanForm.name.trim();
+    if (!name) {
+      Toast.warning('请填写频道名称');
+      return;
+    }
+    const target = chanDialog?.target ?? null;
+    // 已经设了密码的频道，编辑时留空表示不改，不算错；新建或由无到有必须给密码。
+    if (chanForm.password && !target?.password && !chanForm.newPassword.trim()) {
+      Toast.warning('请填写频道密码，或取消勾选「有密码」');
+      return;
+    }
+    if (chanDialog?.mode === 'create') {
+      onCreateChannel?.({
+        name,
+        description: chanForm.description.trim() || undefined,
+        kind: chanForm.kind,
+        password: chanForm.password,
+        newPassword: chanForm.password ? chanForm.newPassword : '',
+        codec: chanForm.codec,
+        quality: chanForm.quality,
+        maxClients: chanForm.maxClients,
+        parent: chanForm.parent,
+        after: 0,
+      });
+      setChanDialog(null);
+      return;
+    }
+    if (!target) return;
+    const patch: ChannelPatch = {};
+    if (name !== (target.display || target.name)) patch.name = name;
+    if (chanForm.description !== (target.description ?? '')) patch.description = chanForm.description.trim();
+    if (chanForm.kind !== (target.kind ?? 'permanent')) patch.kind = chanForm.kind;
+    if (chanForm.password !== target.password) patch.password = chanForm.password;
+    if (chanForm.password && chanForm.newPassword.trim()) patch.newPassword = chanForm.newPassword;
+    if (chanForm.codec !== target.codec) patch.codec = chanForm.codec;
+    if (chanForm.quality !== (target.quality ?? 6)) patch.quality = chanForm.quality;
+    if (chanForm.maxClients !== target.maxClients) patch.maxClients = chanForm.maxClients;
+    if (Object.keys(patch).length === 0) {
+      Toast.info('频道没有改动');
+      setChanDialog(null);
+      return;
+    }
+    onEditChannel?.(target.id, patch);
+    setChanDialog(null);
+  };
+
+  const confirmDeleteChannel = () => {
+    if (!deleteTarget) return;
+    onDeleteChannel?.(deleteTarget.id);
+    setDeleteTarget(null);
   };
 
   const send = () => {
@@ -598,7 +761,7 @@ export default function ServerHome(props: Props) {
               className="sh-sec-plus"
               type="button"
               title="新建频道"
-              onClick={() => Toast.info('频道管理暂未接入，下一步再做')}
+              onClick={() => openCreateChannel()}
             >
               <IconPlus size="small" />
             </button>
@@ -658,6 +821,47 @@ export default function ServerHome(props: Props) {
                       直播中
                     </span>
                   )}
+                  <Dropdown
+                    trigger="click"
+                    position="bottomRight"
+                    spacing={6}
+                    stopPropagation
+                    render={
+                      <Dropdown.Menu className="sh-chan-dd">
+                        <Dropdown.Item icon={<IconPlus />} onClick={() => openCreateChannel(channel.id)}>
+                          <span className="sh-dd-label">新建子频道</span>
+                        </Dropdown.Item>
+                        <Dropdown.Item icon={<IconEdit />} onClick={() => openEditChannel(channel)}>
+                          <span className="sh-dd-label">编辑频道</span>
+                        </Dropdown.Item>
+                        <Dropdown.Divider />
+                        <Dropdown.Item
+                          icon={<IconCopy />}
+                          onClick={() => {
+                            void navigator.clipboard
+                              ?.writeText(String(channel.id))
+                              .then(() => Toast.success('已复制频道 ID'))
+                              .catch(() => Toast.error('复制失败'));
+                          }}
+                        >
+                          <span className="sh-dd-label">复制频道 ID</span>
+                        </Dropdown.Item>
+                        <Dropdown.Divider />
+                        <Dropdown.Item type="danger" icon={<IconDelete />} onClick={() => setDeleteTarget(channel)}>
+                          <span className="sh-dd-label">删除频道</span>
+                        </Dropdown.Item>
+                      </Dropdown.Menu>
+                    }
+                  >
+                    <span
+                      className="sh-chan-more"
+                      title="频道管理"
+                      onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                    >
+                      <IconMore size="small" />
+                    </span>
+                  </Dropdown>
                 </button>
 
                 {hasClients &&
@@ -748,6 +952,7 @@ export default function ServerHome(props: Props) {
             avatarToken={avatarToken}
             accountAvatar={account.avatarUrl}
             size={38}
+            live={stream.sharing !== null}
           />
           <div className="sh-me-info">
             <div className="sh-me-name">{ownMember?.nickname ?? state.nickname}</div>
@@ -849,6 +1054,7 @@ export default function ServerHome(props: Props) {
                   avatarToken={avatarToken}
                   accountAvatar={account.avatarUrl}
                   size={42}
+                  live={stream.sharing !== null}
                 />
                 <div className="sh-more-user-info">
                   <div className="sh-more-user-name">{ownMember?.nickname ?? state.nickname}</div>
@@ -1068,13 +1274,7 @@ export default function ServerHome(props: Props) {
           />
         )}
 
-        <div
-          className="sh-messages"
-          ref={listRef}
-          onScroll={(e) => {
-            if (e.currentTarget.scrollTop < 40 && chatMore && !chatBusy) onLoadMoreChat();
-          }}
-        >
+        <div className="sh-messages sh-ai-messages">
           {chatBusy && <div className="sh-more-hint">加载更早的消息…</div>}
           {chat.length === 0 ? (
             <div className="sh-chat-empty">还没有消息，来打个招呼吧。</div>
@@ -1083,28 +1283,48 @@ export default function ServerHome(props: Props) {
               <div className="sh-day-divider">
                 <span>今天</span>
               </div>
-              {chat.map((line, i) => (
-                <div className={`sh-msg${line.mine ? ' mine' : ''}`} key={`${line.time}-${line.from}-${i}`}>
-                  <Avatar
-                    id={line.from}
-                    name={line.name}
-                    avatar={line.avatar}
-                    myTeamSpeakAvatar={line.myTeamSpeakAvatar}
-                    ownId={state.ownId}
-                    avatarToken={avatarToken}
-                    accountAvatar={account.avatarUrl}
-                    size={40}
-                  />
-                  <div className="sh-msg-body">
-                    <div className="sh-msg-meta">
-                      <span className="sh-msg-name">{line.name}</span>
-                      {line.mine && <span className="sh-badge-me">我</span>}
-                      <span className="sh-msg-time">{fmtTime(line.time)}</span>
-                    </div>
-                    <div className="sh-msg-text">{line.text}</div>
-                  </div>
-                </div>
-              ))}
+              <div className="sh-ai-fill">
+                <AIChatDialogue
+                  ref={dlgRef}
+                  className="sh-aidialogue"
+                  align="leftAlign"
+                  mode="bubble"
+                  chats={aiChats}
+                  roleConfig={AI_ROLE_CONFIG}
+                  showReset={false}
+                  dialogueRenderConfig={{
+                    renderDialogueAvatar: ({ message }) => {
+                      const line = message ? aiLineById.get(String(message.id)) : undefined;
+                      if (!line) return null;
+                      return (
+                        <Avatar
+                          id={line.from}
+                          name={line.name}
+                          avatar={line.avatar}
+                          myTeamSpeakAvatar={line.myTeamSpeakAvatar}
+                          ownId={state.ownId}
+                          avatarToken={avatarToken}
+                          accountAvatar={account.avatarUrl}
+                          size={40}
+                          live={!!findMember(state.tree, line.from)?.streaming}
+                        />
+                      );
+                    },
+                    renderDialogueTitle: ({ message, defaultTitle }) => {
+                      const line = message ? aiLineById.get(String(message.id)) : undefined;
+                      if (!line) return defaultTitle;
+                      return (
+                        <div className="sh-ai-title">
+                          <span className="sh-msg-name">{line.name}</span>
+                          {line.mine && <span className="sh-badge-me">我</span>}
+                          <span className="sh-msg-time">{fmtTime(line.time)}</span>
+                        </div>
+                      );
+                    },
+                    renderDialogueAction: () => null,
+                  }}
+                />
+              </div>
             </>
           )}
         </div>
@@ -1144,6 +1364,177 @@ export default function ServerHome(props: Props) {
           </div>
         </div>
       </main>
+
+      {chanDialog && (
+        <div className="sh-modal-mask" onClick={() => setChanDialog(null)}>
+          <div className="sh-modal sh-modal-form" onClick={(e) => e.stopPropagation()}>
+            <div className="sh-modal-title">
+              {chanDialog.mode === 'create'
+                ? '新建频道'
+                : `编辑「${chanDialog.target?.display || chanDialog.target?.name || ''}」`}
+            </div>
+            <div className="sh-modal-desc">
+              {chanDialog.mode === 'create'
+                ? '填好频道信息后创建；没有权限时服务器会拒绝并在右下角提示。'
+                : '只提交改动过的字段，清空描述即可删除描述。'}
+            </div>
+
+            <div className="sh-form">
+              <label className="sh-form-row">
+                <span className="sh-form-label">名称</span>
+                <input
+                  className="sh-form-input"
+                  value={chanForm.name}
+                  maxLength={60}
+                  autoFocus
+                  onChange={(e) => setChanForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="频道名称"
+                />
+              </label>
+
+              <label className="sh-form-row">
+                <span className="sh-form-label">描述</span>
+                <textarea
+                  className="sh-form-input sh-form-textarea"
+                  value={chanForm.description}
+                  maxLength={300}
+                  rows={2}
+                  onChange={(e) => setChanForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="可选，显示在频道头部"
+                />
+              </label>
+
+              {chanDialog.mode === 'create' && (
+                <label className="sh-form-row">
+                  <span className="sh-form-label">父频道</span>
+                  <select
+                    className="sh-form-input"
+                    value={chanForm.parent}
+                    onChange={(e) => setChanForm((f) => ({ ...f, parent: Number(e.target.value) }))}
+                  >
+                    <option value={0}>（根目录）</option>
+                    {flat
+                      .filter((r) => !r.channel.spacer)
+                      .map(({ channel, depth }) => (
+                        <option key={channel.id} value={channel.id}>
+                          {'　'.repeat(depth) + (channel.display || channel.name)}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
+
+              <div className="sh-form-row">
+                <span className="sh-form-label">类型</span>
+                <select
+                  className="sh-form-input"
+                  value={chanForm.kind}
+                  onChange={(e) => setChanForm((f) => ({ ...f, kind: e.target.value as ChannelKind }))}
+                >
+                  <option value="permanent">永久</option>
+                  <option value="semi">半永久</option>
+                  <option value="temporary">临时</option>
+                </select>
+              </div>
+
+              <div className="sh-form-row">
+                <span className="sh-form-label">编解码</span>
+                <select
+                  className="sh-form-input"
+                  value={chanForm.codec}
+                  onChange={(e) => setChanForm((f) => ({ ...f, codec: Number(e.target.value) }))}
+                >
+                  <option value={4}>Opus Voice</option>
+                  <option value={5}>Opus Music</option>
+                </select>
+              </div>
+
+              <div className="sh-form-row">
+                <span className="sh-form-label">音质</span>
+                <div className="sh-form-inline">
+                  <input
+                    className="sh-form-range"
+                    type="range"
+                    min={0}
+                    max={10}
+                    step={1}
+                    value={chanForm.quality}
+                    onChange={(e) => setChanForm((f) => ({ ...f, quality: Number(e.target.value) }))}
+                  />
+                  <span className="sh-form-val">{chanForm.quality}</span>
+                </div>
+              </div>
+
+              <div className="sh-form-row">
+                <span className="sh-form-label">最大人数</span>
+                <div className="sh-form-inline">
+                  <input
+                    className="sh-form-input"
+                    type="number"
+                    min={-1}
+                    value={chanForm.maxClients}
+                    onChange={(e) => setChanForm((f) => ({ ...f, maxClients: Number(e.target.value) }))}
+                  />
+                  <span className="sh-form-hint">-1 表示不限</span>
+                </div>
+              </div>
+
+              <div className="sh-form-row">
+                <span className="sh-form-label">密码</span>
+                <label className="sh-form-check">
+                  <input
+                    type="checkbox"
+                    checked={chanForm.password}
+                    onChange={(e) => setChanForm((f) => ({ ...f, password: e.target.checked }))}
+                  />
+                  <span>设置频道密码</span>
+                </label>
+              </div>
+
+              {chanForm.password && (
+                <label className="sh-form-row">
+                  <span className="sh-form-label">{chanDialog.mode === 'edit' ? '新密码' : '密码'}</span>
+                  <input
+                    className="sh-form-input"
+                    type="password"
+                    value={chanForm.newPassword}
+                    onChange={(e) => setChanForm((f) => ({ ...f, newPassword: e.target.value }))}
+                    placeholder={chanDialog.mode === 'edit' ? '留空则不修改原密码' : '频道密码'}
+                  />
+                </label>
+              )}
+            </div>
+
+            <div className="sh-modal-actions">
+              <button className="sh-btn-ghost" type="button" onClick={() => setChanDialog(null)}>
+                取消
+              </button>
+              <button className="sh-btn-primary" type="button" onClick={submitChannel}>
+                {chanDialog.mode === 'create' ? '创建' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="sh-modal-mask" onClick={() => setDeleteTarget(null)}>
+          <div className="sh-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sh-modal-title">删除「{deleteTarget.display || deleteTarget.name}」</div>
+            <div className="sh-modal-desc">
+              会连同其子频道一起删除，频道里的人会被移到默认频道。此操作不可撤销。
+            </div>
+            <div className="sh-modal-actions">
+              <button className="sh-btn-ghost" type="button" onClick={() => setDeleteTarget(null)}>
+                取消
+              </button>
+              <button className="sh-btn-danger" type="button" onClick={confirmDeleteChannel}>
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pwChannel && (
         <div className="sh-modal-mask" onClick={() => setPwChannel(null)}>
@@ -1211,6 +1602,33 @@ export default function ServerHome(props: Props) {
 
     </div>
   );
+}
+
+/** 频道表单的本地状态。 */
+type ChanForm = {
+  name: string;
+  description: string;
+  parent: number;
+  kind: ChannelKind;
+  password: boolean;
+  newPassword: string;
+  codec: number;
+  quality: number;
+  maxClients: number;
+};
+
+function defaultChanForm(): ChanForm {
+  return {
+    name: '',
+    description: '',
+    parent: 0,
+    kind: 'permanent',
+    password: false,
+    newPassword: '',
+    codec: 4,
+    quality: 6,
+    maxClients: -1,
+  };
 }
 
 /** 本地 findChannel，避免每个渲染都深搜两次。 */
