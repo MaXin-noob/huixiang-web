@@ -407,6 +407,20 @@ class WebSession(
         c.sendCommand(Commands.build("clientgetvariables", "clid" to clid, "return_code" to "person-$clid"))
     }
 
+    /**
+     * 戳一戳：给某个在线成员发一条 clientpoke。不要求自定义文案（[text] 为空时用一句默认的「戳了你一下」）。
+     * 成功/失败按频道管理的同一套 op 回执（chanOp）回到页面，前端弹「戳一戳成功 / 失败：原因」。
+     */
+    fun poke(clid: Int, text: String = "") {
+        val c = client ?: return
+        if (clid <= 0) return
+        val id = "poke-" + opSeq.incrementAndGet()
+        pendingOps[id] = OpState("戳一戳", 1)
+        c.sendCommand(
+            Commands.build("clientpoke", "clid" to clid, "msg" to text.ifBlank { "戳了你一下" }, "return_code" to id)
+        )
+    }
+
     fun setInputMuted(muted: Boolean) {
         inputMuted = muted
         syncMutes()
@@ -905,6 +919,20 @@ class WebSession(
                             "peerUid" to peerUid,
                             "peerName" to peerName,
                             "mine" to (ownId != 0 && from == ownId),
+                        )
+                    )
+                )
+            }
+            // 有人戳了戳我：把发起人转给页面弹提示（不进聊天记录，和官方客户端一致）。
+            "notifyclientpoke" -> {
+                sink.text(
+                    Json.write(
+                        mapOf(
+                            "t" to "poke",
+                            "from" to (cmd["invokerid"]?.toIntOrNull() ?: 0),
+                            "name" to cmd["invokername"].orEmpty(),
+                            "uid" to cmd["invokeruid"].orEmpty(),
+                            "msg" to cmd["msg"].orEmpty(),
                         )
                     )
                 )

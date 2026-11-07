@@ -488,6 +488,17 @@ export default function App() {
           else Toast.error(`${r.label}失败：${r.error ?? '未知错误'}`);
         },
         onPerson: (p) => setPersonDetails((prev) => ({ ...prev, [p.id]: p })),
+        // 有人戳了戳我：弹一条提示；页面不在前台时再补一条桌面通知（跟聊天消息同一套开关）。
+        onPoke: (p) => {
+          const me = stateRef.current?.ownId ?? 0;
+          if (p.from && p.from === me) return;
+          const who = p.name || '有人';
+          Toast.info(`${who} 戳了戳你`);
+          if (notifyOnRef.current) {
+            const hidden = document.visibilityState === 'hidden' || !document.hasFocus();
+            if (hidden) showMessageNotice({ title: `${who} 戳了戳你`, body: '', tag: `poke:${p.from}` });
+          }
+        },
         onClose: (code) => {
           // 掉线/关页前记一笔开关，重连后恢复
           {
@@ -972,6 +983,9 @@ export default function App() {
   // 资料卡：向服务器补问某人的公开字段（答案从 onPerson 回来并缓存）
   const requestPerson = useCallback((clientId: number) => gatewayRef.current?.requestPerson(clientId), []);
 
+  /** 戳一戳某个成员；成功/失败由网关的 onChanOp 回执弹提示。 */
+  const poke = useCallback((clientId: number) => gatewayRef.current?.poke(clientId), []);
+
   const content = useMemo(() => {
     if (!state) {
       return (
@@ -1064,6 +1078,7 @@ export default function App() {
         onBanMember={banMember}
         personDetails={personDetails}
         onPerson={requestPerson}
+        onPoke={poke}
       />
     );
   }, [
@@ -1138,6 +1153,7 @@ export default function App() {
     banMember,
     personDetails,
     requestPerson,
+    poke,
   ]);
 
   return (
