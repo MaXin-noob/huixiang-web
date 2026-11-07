@@ -111,6 +111,8 @@ class WebSession(
     }
 
     private val model = ServerModel()
+    /** Channels whose description we've already asked for (the plain channellist doesn't carry it). */
+    private val descRequested = HashSet<Int>()
     private val pushTimer = Executors.newSingleThreadScheduledExecutor { r ->
         Thread(r, "web-push").apply { isDaemon = true }
     }
@@ -241,6 +243,7 @@ class WebSession(
         error = null
         phase = Phase.CONNECTING
         model.clear()
+        descRequested.clear()
         channelPasswords.clear()
         pendingChannelPassword = channelPassword
         dirty.set(true)
@@ -844,7 +847,15 @@ class WebSession(
         ft?.onCommand(cmd)
         when (cmd.name) {
             // Everyone on the server, not only the people in our own channel.
-            "channellistfinished" -> client?.sendCommand("channelsubscribeall")
+            "channellistfinished" -> {
+                client?.sendCommand("channelsubscribeall")
+                // The server's plain channellist carries no channel_description, so ask for each channel's
+                // description once; it comes back as notifychanneledited and the model stores it.
+                for (ch in model.channels.values) {
+                    if (!descRequested.add(ch.id)) continue
+                    client?.sendCommand(Commands.build("channelgetdescription", "cid" to ch.id))
+                }
+            }
             "notifychannelcreated" -> client?.sendCommand(Commands.build("channelsubscribe", "cid" to cmd["cid"]))
             "notifytextmessage" -> {
                 val from = cmd["invokerid"]?.toIntOrNull() ?: 0

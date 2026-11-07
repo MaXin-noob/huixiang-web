@@ -596,20 +596,43 @@ body {
 }
 
 .peek-eye {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   background: #fff;
-  overflow: hidden;
-  animation: peek-blink 6.2s ease-in-out infinite;
+  /* 平时允许眼皮盖出眼睛边界 1px，压住眼白边缘那圈抗锯齿的白线 */
+  overflow: visible;
   transition: height 0.22s ease, border-radius 0.22s ease;
+}
+
+/* 眨眼只动「眼皮」：单独一层从眼睛顶部盖下来遮住眼珠，
+   眼珠（.peek-pupil）本身不缩放、不跟着眨 */
+.peek-eye::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: var(--blob-color, #e9f6a8);
+  transform: scaleY(0);
+  transform-origin: top center;
+  animation: peek-blink 6.2s ease-in-out infinite;
+  pointer-events: none;
 }
 
 /* 眯成一条缝 = 捂眼 */
 .peek-guard.is-hiding .peek-eye {
   height: 5px !important;
   animation: none;
+  /* 眯眼时把眼珠裁进这条缝里 */
+  overflow: hidden;
+}
+
+/* 捂眼时眼皮别再来回盖，保持眯缝 */
+.peek-guard.is-hiding .peek-eye::after {
+  animation: none;
+  transform: scaleY(0);
 }
 
 .peek-pupil {
@@ -622,14 +645,15 @@ body {
   opacity: 0;
 }
 
+/* 0 = 睁开（眼皮收起），1 = 闭上（眼皮盖满整只眼） */
 @keyframes peek-blink {
   0%,
   92%,
   100% {
-    transform: scaleY(1);
+    transform: scaleY(0);
   }
   95% {
-    transform: scaleY(0.12);
+    transform: scaleY(1);
   }
 }
 
@@ -2633,8 +2657,8 @@ body {
 
 /* 弹层：麦克风和成员共用 */
 .vol-pop {
-  width: 178px;
-  padding: 2px 4px 0;
+  width: 140px;
+  padding: 0;
 }
 
 .vol-pop-head {
@@ -2662,11 +2686,54 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Semi 把滑块宽度写死成 132px，弹层里要铺满；左右留 10px 给手柄 */
+/* 横向滑块：撑满 .vol-pop 宽度 */
 .vol-pop .vol-slider,
 .vol-pop .semi-slider {
   width: 100%;
-  padding: 0 10px;
+  padding: 0 9px;
+}
+
+.vol-pop .semi-slider-wrapper {
+  height: 24px;
+}
+
+/* 绿色轨道 + 小一号的绿色描边圆点 */
+.vol-pop .semi-slider-rail {
+  background: #e5f6e9;
+  height: 4px;
+}
+
+.vol-pop .semi-slider-track {
+  background: #00b42a;
+  height: 4px;
+}
+
+.vol-pop .semi-slider-handle {
+  width: 16px;
+  height: 16px;
+  margin-top: 8px;
+  background: #fff;
+  border: 2px solid #00b42a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.vol-pop .semi-slider-handle:hover,
+.vol-pop .semi-slider-handle-clicked {
+  border-color: #00a026;
+}
+
+/* 去掉弹层自带的白底卡片 / 内边距 / 描边 / 阴影，只留滑块本体 */
+.semi-popover-with-arrow:has(.vol-pop),
+.semi-popover:has(.vol-pop) {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.semi-popover-wrapper:has(.vol-pop) .semi-popover-icon-arrow {
+  display: none;
 }
 
 .vol-pop-foot {
@@ -3292,7 +3359,8 @@ button.files-name:hover {
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(360px, 88vw);
+  width: 50vw;
+  min-width: 360px;
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);
@@ -3300,6 +3368,12 @@ button.files-name:hover {
   box-shadow: -12px 0 40px rgba(20, 16, 40, 0.16);
   z-index: 60;
   animation: friends-slide 0.18s ease;
+  /* 好友/聊天侧栏主题色改为绿色（只作用于本抽屉，不影响全站） */
+  --brand: #22c55e;
+  --brand-deep: #16a34a;
+  --brand-soft: rgba(34, 197, 94, 0.12);
+  --semi-color-primary: #22c55e;
+  --semi-color-primary-light-default: rgba(34, 197, 94, 0.12);
 }
 
 @keyframes friends-fade {
@@ -4190,4 +4264,92 @@ button.files-name:hover {
 /* 设置面板底部再留一点呼吸空间，避免贴边像被截断 */
 .settings-body {
   padding-bottom: 12px;
+}
+
+/* 用户资料卡里的个人音量 */
+.uc-vol dd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.uc-vol-range {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 2px;
+  background: #e5f6e9;
+  outline: none;
+  cursor: pointer;
+}
+.uc-vol-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #e5f6e9;
+}
+.uc-vol-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: #00b42a;
+  border: 2px solid #ffffff;
+  box-sizing: border-box;
+}
+.uc-vol-range::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #e5f6e9;
+}
+.uc-vol-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #00b42a;
+  border: 2px solid #ffffff;
+  box-sizing: border-box;
+}
+.uc-vol-pct {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ====== 直播画面：按钮加长 + 高度可拖拽 ====== */
+.stream-btn-text {
+  min-width: 76px;
+  padding: 0 18px;
+}
+
+.stream-resize {
+  flex: 0 0 auto;
+  height: 12px;
+  margin: -6px 20px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.stream-resize-grip {
+  width: 46px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.16);
+  transition: background 0.15s ease;
+}
+
+.stream-resize:hover .stream-resize-grip {
+  background: rgba(15, 23, 42, 0.34);
+}
+
+@media (max-width: 860px) {
+  .stream-resize {
+    margin: -6px 12px 6px;
+  }
 }

@@ -365,17 +365,14 @@ export interface FilesMessage {
   error: string | null;
 }
 
-/** 下行语音帧的头部长度：[2][codec][clientId 高][clientId 低] */
-export const VOICE_HEADER = 4;
-export const UP_VOICE = 1;
-export const DOWN_VOICE = 2;
-
 export interface ConnectOptions {
   host: string;
   port: number;
   nickname: string;
   password: string;
   identity: string | null;
+  /** 游客登录：昵称始终用用户自己填的，不被 myTeamSpeak 账号名覆盖 */
+  guest?: boolean;
 }
 
 // ====== 本地保存 ======
@@ -392,6 +389,7 @@ const KEY = {
   recent: 'huixiang.recent',
   nickname: 'huixiang.nickname',
   micGain: 'huixiang.micGain',
+  outputGain: 'huixiang.outputGain',
   micMode: 'huixiang.micMode',
   volumes: 'huixiang.volumes',
   notify: 'huixiang.notify',
@@ -478,6 +476,15 @@ export const store = {
   },
   setMicGain(v: number) {
     localStorage.setItem(KEY.micGain, String(clampGain(v)));
+  },
+  /** 扬声器总音量，0–2。只存本地，不跟账号走。 */
+  outputGain(): number {
+    const raw = localStorage.getItem(KEY.outputGain);
+    if (raw === null) return DEFAULT_GAIN;
+    return clampGain(Number(raw));
+  },
+  setOutputGain(v: number) {
+    localStorage.setItem(KEY.outputGain, String(clampGain(v)));
   },
   /** 说话方式：自动（检测到人声才发）/ 常开 / 按住说话。跟着这台机器走。 */
   micMode(): MicMode {

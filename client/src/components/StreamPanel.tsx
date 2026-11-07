@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { IconVolume2, IconVolumnSilent } from '@douyinfe/semi-icons';
 import type { StreamState } from '../stream';
 
@@ -28,6 +34,30 @@ export default function StreamPanel({ stream, streamerName, ownName, onStopShare
   // 自己共享时绝不回声，所以自己这一侧永远静音
   const [muted, setMuted] = useState(sharing);
   const [fullscreen, setFullscreen] = useState(false);
+
+  // 画面高度可拖拽：用户把画面缩小，就把空间还给下面的聊天
+  const [stageHeight, setStageHeight] = useState(280);
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+
+  const onResizeDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    dragRef.current = { startY: e.clientY, startH: stageHeight };
+    const move = (ev: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      const parentH = stageRef.current?.parentElement?.clientHeight ?? window.innerHeight;
+      const max = Math.max(160, Math.min(window.innerHeight - 200, parentH - 150));
+      const next = Math.min(max, Math.max(110, d.startH + (ev.clientY - d.startY)));
+      setStageHeight(next);
+    };
+    const up = () => {
+      dragRef.current = null;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }, [stageHeight]);
 
   useEffect(() => {
     setMuted(sharing);
@@ -89,55 +119,72 @@ export default function StreamPanel({ stream, streamerName, ownName, onStopShare
         : '还没有人看';
 
   return (
-    <div className="stream-stage" ref={stageRef}>
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted={muted}
-        onDoubleClick={toggleFullscreen}
-      />
+    <>
+      <div
+        className="stream-stage"
+        ref={stageRef}
+        style={fullscreen ? undefined : { flex: '0 0 auto', height: stageHeight }}
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={muted}
+          onDoubleClick={toggleFullscreen}
+        />
 
-      {/* 还没出画面时给一句话，别让人对着一块黑屏猜 */}
-      {watching && stream.remoteStatus !== 'live' && (
-        <div className="stream-hint">{subtitle || '等待画面…'}</div>
-      )}
+        {/* 还没出画面时给一句话，别让人对着一块黑屏猜 */}
+        {watching && stream.remoteStatus !== 'live' && (
+          <div className="stream-hint">{subtitle || '等待画面…'}</div>
+        )}
 
-      <div className="stream-bar">
-        <span className={`live-dot${stream.live || stream.remoteStatus === 'live' ? '' : ' is-idle'}`} aria-hidden="true" />
-        <span className="stream-title" title={title}>
-          {title}
-        </span>
-        {subtitle && <span className="stream-sub">{subtitle}</span>}
-        <span className="stream-spacer" />
-        <button
-          type="button"
-          className="stream-btn"
-          onClick={toggleFullscreen}
-          title={fullscreen ? '退出全屏（也可以按 Esc）' : '全屏看（双击画面也行）'}
-        >
-          {fullscreen ? '退出全屏' : '全屏'}
-        </button>
-        {watching && (
+        <div className="stream-bar">
+          <span className={`live-dot${stream.live || stream.remoteStatus === 'live' ? '' : ' is-idle'}`} aria-hidden="true" />
+          <span className="stream-title" title={title}>
+            {title}
+          </span>
+          {subtitle && <span className="stream-sub">{subtitle}</span>}
+          <span className="stream-spacer" />
           <button
             type="button"
-            className="stream-btn"
-            onClick={() => {
-              const v = videoRef.current;
-              const next = !muted;
-              if (v) v.muted = next;
-              setMuted(next);
-            }}
-            title={muted ? '打开声音' : '静音'}
-            aria-pressed={muted}
+            className="stream-btn stream-btn-text"
+            onClick={toggleFullscreen}
+            title={fullscreen ? '退出全屏（也可以按 Esc）' : '全屏看（双击画面也行）'}
           >
-            {muted ? <IconVolumnSilent /> : <IconVolume2 />}
+            {fullscreen ? '退出全屏' : '全屏'}
           </button>
-        )}
-        <button type="button" className="stream-btn" onClick={watching ? onStopWatch : onStopShare}>
-          {watching ? '关掉' : '停止直播'}
-        </button>
+          {watching && (
+            <button
+              type="button"
+              className="stream-btn stream-btn-text"
+              onClick={() => {
+                const v = videoRef.current;
+                const next = !muted;
+                if (v) v.muted = next;
+                setMuted(next);
+              }}
+              title={muted ? '打开声音' : '静音'}
+              aria-pressed={muted}
+            >
+              {muted ? <IconVolumnSilent /> : <IconVolume2 />}
+            </button>
+          )}
+          <button
+            type="button"
+            className="stream-btn stream-btn-text"
+            onClick={watching ? onStopWatch : onStopShare}
+          >
+            {watching ? '关掉' : '停止直播'}
+          </button>
+        </div>
       </div>
-    </div>
+
+      {/* 拖拽条：上下拖动调整画面高度，缩小后聊天区自动变大 */}
+      {!fullscreen && (
+        <div className="stream-resize" onPointerDown={onResizeDown} title="拖动调整画面高度">
+          <span className="stream-resize-grip" />
+        </div>
+      )}
+    </>
   );
 }

@@ -3,55 +3,44 @@ import { Popover, Slider } from '@douyinfe/semi-ui';
 import { clampGain, gainPercent } from '../audio/gain';
 
 interface Props {
-  /** 调的是谁：麦克风叫「麦克风音量」，成员就叫昵称。 */
+  /** 无障碍名称（不再在弹层里显示标题文字）。 */
   title: string;
   /** 0–2 的增益。 */
   value: number;
   onChange: (v: number) => void;
-  /** 拖到 0 时的提醒，说明「听不到」的具体后果。 */
+  /** 兼容旧调用方，已不再展示提示文案。 */
   zeroHint?: string;
+  /** 触发方式，默认点击。 */
+  trigger?: 'click' | 'hover';
   children: ReactNode;
 }
 
 /**
- * 音量弹层：麦克风和每个成员共用一个滑块，刻度、文案、复原动作都只写一遍。
+ * 音量弹层：只保留一根滑块，不显示标题 / 百分比 / 提示 / 复原，
+ * 并去掉弹层自带的白底卡片、内边距、描边和阴影——整个控件就是滑块本身大小。
  * 0 = 听不到，100% = 原始电平，200% = +6dB。
  */
-export default function VolumePopover({ title, value, onChange, zeroHint, children }: Props) {
+export default function VolumePopover({ title, value, onChange, trigger = 'click', children }: Props) {
   const pct = gainPercent(value);
-  const hint =
-    pct === 0 ? (zeroHint ?? '0% 等于静音') : pct > 100 ? '超过 100% 会连底噪一起放大' : '100% 是原始音量';
 
   return (
     <Popover
-      trigger="click"
+      trigger={trigger}
       position="top"
-      showArrow
+      showArrow={false}
+      style={{ padding: 0, background: 'transparent', boxShadow: 'none', border: 'none' }}
       content={
         <div className="vol-pop">
-          <div className="vol-pop-head">
-            <span className="vol-pop-title" title={title}>
-              {title}
-            </span>
-            <b className="vol-pop-value">{pct}%</b>
-          </div>
           <Slider
             className="vol-slider"
             value={pct}
             min={0}
             max={200}
             step={5}
+            aria-label={title}
             tooltipFormatter={(v: number | string) => `${v}%`}
             onChange={(v) => onChange(clampGain(Number(v) / 100))}
           />
-          <div className="vol-pop-foot">
-            <span className={`vol-pop-hint${pct === 0 ? ' is-zero' : ''}`}>{hint}</span>
-            {pct !== 100 && (
-              <button type="button" className="vol-reset" onClick={() => onChange(1)}>
-                复原
-              </button>
-            )}
-          </div>
         </div>
       }
     >
