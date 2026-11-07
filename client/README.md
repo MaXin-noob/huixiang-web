@@ -20,33 +20,38 @@ npm run build        # tsc 类型检查 + 打包到 dist/
 
 ```
 src/
-  App.tsx                  连接生命周期、账号与语音状态、语音开关
-  protocol.ts              网关协议类型、本地存储、树查找
+  main.tsx                 入口（生产构建下注册 Service Worker）
+  App.tsx                  连接生命周期、账号/语音/串流状态、聊天历史、对外回调
+  protocol.ts              网关协议类型、本地存储、频道树工具
   gateway.ts               WebSocket 封装（含口令认证、账号/书签/好友消息）
   account.ts               账号错误码、头像裁切与 HTTP 上传/删除
   notify.ts                桌面通知：权限申请与弹通知（Notification API）
-  files.ts                 文件字节：HTTP 下载（列表命令仍走 gateway.ts）
+  files.ts                 文件字节：HTTP 下载/上传（列表命令仍走 gateway.ts）
+  chatHistory.ts           频道聊天历史：IndexedDB，300 条 / 90 天
   stream.ts                屏幕 / 摄像头串流（画面是 WebRTC，不经网关）
-  talking.ts               谁在说话：按下行语音帧的实际音量判读（静音帧不算）
+  talking.ts               谁在说话：按语音帧的实际音量判读（静音帧不算）
   presence.ts              成员进出提示：对比前后两帧快照里我所在频道的成员
   ui.ts                    头像来源逐级回退、首字母、稳定配色
-  audio/cues.ts            进出频道提示音（Web Audio 合成，无音频文件）
+  styles.css               全局样式
   audio/
+    context.ts             共用 AudioContext
+    gain.ts                增益换算
+    cues.ts                进出频道提示音（Web Audio 合成，无音频文件）
     player.ts              下行：每人一个 AudioDecoder，Web Audio 排程播放
     mic.ts                 上行：AudioWorklet 攒 20ms → 自动人声检测 → AudioEncoder 编 Opus
     capture-worklet.js     采集用的 worklet（纯 JS，不能写 TS）
   components/
-    ConnectPage.tsx        地址、昵称、密码、口令、最近连接；myTeamSpeak 登录、云书签、好友
-    ServerPage.tsx         整体布局 + 改名、频道密码、频道/成员管理弹窗
-    ChannelTree.tsx        频道与成员；右键/「⋯」新建、编辑、删除频道，成员右键踢/封
-    ChatPanel.tsx          频道文字（带头像）
-    Stage.tsx              当前频道成员（谁在说话、头像、单人音量、踢/封）
+    ConnectPage.tsx        登录 / 游客连接：地址、昵称、密码、口令、最近连接；云书签
+    ServerHome.tsx         服务器页：频道列表、成员、聊天、控制条、文件/好友抽屉、设置
     StreamPanel.tsx        串流画面与工具条（全屏、静音）
     FilesPanel.tsx         频道文件区（右侧抽屉：浏览、下载、上传、新建文件夹、改名、删除）
-    ServerInfo.tsx         右栏服务器信息 + 账号头像/好友
-    ControlBar.tsx         麦克风、扬声器、直播、离开
-    VolumePopover.tsx      音量滑块
+    FriendsPanel.tsx       好友与云聊天（右侧抽屉）
+    UserCard.tsx           成员资料卡（UID/频道/身份组/客户端/地区/状态、单人音量）
     UserAvatar.tsx         圆形头像：多地址逐级回退，最后是首字母
+    VolumePopover.tsx      音量滑块
+    AwayPopover.tsx        暂离设置与离开留言
+    ChannelIcon.tsx        频道图标
+    PeekGuard.tsx          登录页「捂眼」动画
     PresenceToasts.tsx     右下角成员进出提示（aria-live）
 ```
 
@@ -79,6 +84,8 @@ src/
 - **按住说话**：按住按钮或空格才发，松手时把 worklet 静音。
 - 选择存在 `huixiang.micMode`。自动模式要一直听，所以 worklet 不会静音，只是不编码。
 - 头像点亮的门槛是另一个常量 `TALK_LEVEL = 0.045`，只管显示，跟发不发无关。
+
+> 说明：三档切换的界面入口尚未在 `ServerHome` 接入（`onMicMode` / `onPttHold` 回调已由 `App.tsx` 备好），当前固定为「自动」档。
 
 ## 浏览器要求
 
@@ -128,38 +135,37 @@ FAKE_MIC=1 node test/shot.mjs http://127.0.0.1:8080/ shot.png 3000 "..."
 连接页顶部是 myTeamSpeak 账号卡片，下面仍是原来的游客连接表单——不登录也能填地址进。
 
 - 登录后显示账号昵称、邮箱和头像，并拉取云书签和好友列表；点云书签会把地址、昵称和服务器密码填进表单（密码不显示）。
-- 头像可在连接页或右栏账号卡里设置/删除：`account.ts` 先把图片裁成 320×320，压到 512 KB 内的 PNG，再 `POST /account/avatar`。
+- 头像上传 / 删除的界面入口随服务器页重构暂时下线：`account.ts` 已实现裁图（320×320、512 KB 内 PNG）与 `POST /account/avatar`，`App.tsx` 也已备好 `changeAccountAvatar` / `removeAccountAvatarNow`，待 `ServerHome` 提供入口后即可恢复。
 - 频道里成员头像优先用服务器头像（`/avatar/<avatarToken>/<id>?v=<flag>`），其次对方公开的 myTS 头像，失败退回首字母；自己登录时优先用账号头像。
 - 好友既可查看列表，也能跨服云聊天（Matrix）；登录后连接会带 myTeamSpeak 语音身份，要完全匿名先退出账号。
 - **记住登录**：密码登录成功后网关发一条 `remember` 消息，`account.ts` 把它换成 `HttpOnly` cookie（30 天）；之后打开或刷新页面会自动连上网关并恢复登录，退出登录则删掉 cookie。密码、令牌和书签密钥都不进浏览器存储。
 
 ## 消息通知
 
-服务器页顶栏有一个「通知」开关，开着时收到别人的消息会弹一条系统通知，切到别的窗口/标签页也能看见。
+服务器页顶栏「设置」面板里有一个「桌面通知」开关，开着时收到别人的消息会弹一条系统通知，切到别的窗口/标签页也能看见。
 
 - 权限必须在点击开关时申请（浏览器只允许用户手势里调 `Notification.requestPermission`）；被拒绝或不支持（比如用 http 打开非 localhost）会提示，并且开关保持关闭。
 - **私聊一律提醒**；频道消息只在页面不在前台、或者消息来自你当前不在的频道时提醒——正盯着当前频道的聊天就不打扰。
 - 同一个人/同一个频道的新消息共用一个 `tag`，系统通知里是替换而不是堆一屏；点通知会把页面拉回前台。
 - 关掉标签页后不再提醒（Service Worker 只做了壳缓存，没有接入 Web Push），这是当前实现的边界。
 
-## 频道管理
+## 频道管理（界面接入中）
 
-有权限的账号可以直接在网页里管理服务器频道：
-
-- 频道树里对任意频道右键，或点行内「⋯」：新建子频道 / 编辑频道 / 删除频道；顶栏频道区「+」也能新建。
-- 对频道里的其他人右键，或点成员卡片「⋯」：踢出 / 封禁（可填原因与封禁时长）。
-- 表单里能改名称、描述、类型（常驻 / 半常驻 / 临时）、编解码、音质、人数上限、密码。
-- 结果用 Toast 提示；没有权限会显示服务器返回的中文原因。所有操作只在有对应 `i_channel_*` 权限时才会成功。
+网关与 `tsproto.ChannelEdits` 已实现建 / 删 / 改频道、踢人与封禁，以及频道排序；`App.tsx` 也把 `onCreateChannel`、`onEditChannel`、`onDeleteChannel`、`onKickMember`、`onBanMember` 等回调传给了服务器页。但新版 `ServerHome` 目前只保留「新建频道」按钮占位（点击提示「暂未接入」），旧的 `ServerPage` / `ChannelTree` 已随重构删除，因此这些界面需要在新页面上重新接入后才能使用。
 
 ## 成员进出提示
 
 有人进入或离开你当前所在的频道时，右下角弹出一条提示，并配一声进 / 离提示音。纯前端实现：对比网关每 120ms 推送的快照里的频道成员即可，不额外请求服务器。只有你自己已经进入频道后才提示（首次进频道、自己换频道都不误报）。
 
-## 还没做
+## 功能现状
 
-- 私聊：**不做**（按需求砍掉了，网关侧仍支持，将来要加只需改前端）
+**已接入服务器页（`ServerHome`）**：频道列表（图标、密码锁、分隔符、折叠、按频道/成员搜索、双击进入含频道密码）、频道描述与在线人数、成员列表（说话状态、离开、直播中、资料卡、单人音量）、频道文字与历史翻页、「设置」里的桌面通知、暂离（Away）、麦克风/扬声器音量、屏幕共享（WebRTC）与观看直播、频道文件（`FilesPanel`）、好友与云聊天（`FriendsPanel`）、戳一戳（成员资料卡右上角）、离开服务器。
 
-已做：频道文字、切频道（含密码）、改名、静音同步、双向语音、**自动人声检测 / 常开 / 按住说话三档**（自动档安静时不发帧；按住说话支持空格键，输入框内不拦截）、单人音量、屏幕与摄像头串流、**频道文件的浏览 / 下载 / 上传 / 新建文件夹 / 改名 / 删除**、**myTeamSpeak 登录 / 云书签 / 好友 / 好友云聊天 / 头像**、**延迟显示**（浏览器↔网关 + 网关↔服务器）、**新消息桌面通知**、**频道管理（建 / 删 / 改 / 踢 / 封）**、**成员进出提示**、**PWA 安装**。
+**逻辑已就绪、界面接入中**：频道管理（建 / 删 / 改 / 踢 / 封）、频道排序、改名、说话方式三档切换（自动 / 常开 / 按住说话）、摄像头共享入口、头像上传 / 删除入口。详见根目录 README 的「开发计划」。
+
+**尚未实现**：频道聊天内发图片、身份组 / 权限面板、移动成员、流媒体中继、触屏适配等。
+
+> 说明：旧版 `ServerPage` 时代的私聊面板已合并进「好友」抽屉——对方在线走服务器私聊，离线走云端聊天（Matrix）。
 
 ## 文件是怎么走的
 
