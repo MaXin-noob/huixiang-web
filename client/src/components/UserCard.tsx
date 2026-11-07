@@ -44,6 +44,8 @@ export default function UserCard({
           sources={avatarSources(member, ownId, accountAvatar, avatarToken)}
           colorKey={me ? 'me' : member.uid || member.id}
           className="user-card-avatar"
+          live={member.streaming}
+          size={52}
         />
         <div className="user-card-ident">
           <div className="user-card-name" title={member.nickname}>

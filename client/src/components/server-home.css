@@ -609,6 +609,19 @@
   object-fit: cover;
 }
 
+/* Semi Avatar 版本：不裁切顶部「直播」角标，故不复用上面的 overflow:hidden */
+.sh-avatar-semi {
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+
+/* 小尺寸头像上的直播角标：默认档位字太小（6px），这里放大到可读 */
+.sh-avatar-semi .semi-avatar-top_slot-content {
+  font-size: 9px;
+  line-height: 10px;
+  margin-top: 0;
+}
+
 /* ================= 右栏 ================= */
 .sh-chat {
   flex: 1;
@@ -710,6 +723,63 @@
   text-align: center;
   font-size: 11px;
   color: var(--sh-text-4);
+}
+
+/* 聊天区：Semi AIChatDialogue（气泡模式 + 左对齐） */
+.sh-messages.sh-ai-messages {
+  overflow: hidden;
+  gap: 0;
+  padding: 0 8px 12px;
+}
+
+.sh-ai-fill {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sh-aidialogue {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sh-aidialogue .semi-ai-chat-dialogue-wrapper {
+  padding: 8px 12px;
+}
+
+.sh-aidialogue .semi-ai-chat-dialogue-avatar {
+  width: 40px;
+  height: 40px;
+}
+
+.sh-aidialogue .semi-ai-chat-dialogue-title {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.sh-ai-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.sh-ai-title .sh-msg-name {
+  font-weight: 600;
+}
+
+.sh-ai-title .sh-msg-time {
+  font-size: 11px;
+}
+
+.sh-aidialogue .semi-ai-chat-dialogue-content-bubble {
+  background: var(--sh-field);
+  color: var(--sh-text-1);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 12px;
 }
 
 .sh-day-divider {
@@ -1296,4 +1366,177 @@
   margin-top: 2px;
   padding-top: 6px;
   border-top: 1px solid var(--sh-line-soft, rgba(0, 0, 0, 0.08));
+}
+
+/* ===== 频道管理：行内「更多」、悬浮菜单、表单弹窗 ===== */
+.sh-chan-more {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--sh-text-4);
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.sh-chan:hover .sh-chan-more,
+.sh-chan.selected .sh-chan-more,
+.sh-chan:focus-visible .sh-chan-more {
+  opacity: 1;
+}
+
+.sh-chan-more:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--sh-text-2);
+}
+
+.sh-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+.sh-chan-dd {
+  min-width: 0;
+  width: max-content;
+  padding: 6px;
+  border-radius: 14px;
+}
+
+.sh-chan-dd .semi-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 14px;
+  line-height: 1.25;
+  color: var(--sh-text-1);
+  white-space: nowrap;
+}
+
+.sh-chan-dd .semi-dropdown-item-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--sh-text-3);
+}
+
+.sh-chan-dd .semi-dropdown-item-danger,
+.sh-chan-dd .semi-dropdown-item-danger .semi-dropdown-item-icon {
+  color: #d9363e;
+}
+
+.sh-dd-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sh-modal-form {
+  width: 440px;
+  max-width: calc(100vw - 32px);
+  max-height: min(88vh, 720px);
+  overflow-y: auto;
+}
+
+.sh-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.sh-form-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.sh-form-label {
+  flex: 0 0 64px;
+  padding-top: 8px;
+  font-size: 13px;
+  color: var(--sh-text-3);
+}
+
+.sh-form-input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--sh-line);
+  border-radius: 9px;
+  background: var(--sh-field);
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--sh-text-1);
+  outline: none;
+}
+
+.sh-form-input:focus {
+  border-color: var(--sh-brand);
+  background: #fff;
+}
+
+.sh-form-textarea {
+  height: auto;
+  min-height: 58px;
+  padding: 8px 10px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.sh-form-inline {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sh-form-range {
+  flex: 1;
+  accent-color: var(--sh-brand);
+}
+
+.sh-form-val {
+  flex: 0 0 auto;
+  width: 18px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--sh-text-2);
+}
+
+.sh-form-hint {
+  font-size: 12px;
+  color: var(--sh-text-4);
+  white-space: nowrap;
+}
+
+.sh-form-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 7px;
+  font-size: 13.5px;
+  color: var(--sh-text-2);
+}
+
+.sh-btn-danger {
+  height: 34px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 9px;
+  background: #d9363e;
+  color: #fff;
+  font-size: 13px;
+}
+
+.sh-btn-danger:hover {
+  background: #c22b33;
 }
