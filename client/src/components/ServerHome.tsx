@@ -35,6 +35,7 @@ import {
   type FilesMessage,
   type Friend,
   type Member,
+  type MicMode,
   type PersonDetails,
   type State,
 } from '../protocol';
@@ -69,6 +70,14 @@ interface Props {
   onToggleInput: () => void;
   onToggleOutput: () => void;
   onDisconnect: () => void;
+  /** 说话方式：自动（检测到人声才发）/ 常开 / 按住说话，默认自动。 */
+  micMode?: MicMode;
+  onMicMode?: (mode: MicMode) => void;
+  /** 按住说话时是否正按着（仅 ptt 模式有意义）。 */
+  pttHeld?: boolean;
+  onPttHold?: (held: boolean) => void;
+  /** 浏览器是否已具备语音编解码能力（WebCodecs），否则语音不可用。 */
+  audioReady?: boolean;
   /** 麦克风增益（0–2），默认 1。 */
   micGain?: number;
   onMicGain?: (v: number) => void;
@@ -297,6 +306,11 @@ export default function ServerHome(props: Props) {
     onSay,
     onToggleInput,
     onDisconnect,
+    micMode = 'auto',
+    onMicMode,
+    pttHeld = false,
+    onPttHold,
+    audioReady = false,
     micGain = 1,
     onMicGain,
     outputGain = 1,
@@ -391,6 +405,36 @@ export default function ServerHome(props: Props) {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [chat.length]);
+
+  // 按住说话：仅在 ptt 模式下监听空格键。输入框里打空格要正常输入，故跳过可编辑元素。
+  useEffect(() => {
+    if (micMode !== 'ptt') return;
+    const editable = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+    };
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat || editable(e.target)) return;
+      e.preventDefault();
+      onPttHold?.(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || editable(e.target)) return;
+      onPttHold?.(false);
+    };
+    const release = () => onPttHold?.(false);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', release);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', release);
+      onPttHold?.(false);
+    };
+  }, [micMode, onPttHold]);
 
   const toggleCollapse = (id: number) =>
     setCollapsed((prev) => {
@@ -713,6 +757,25 @@ export default function ServerHome(props: Props) {
             </div>
           </div>
           <div className="sh-me-actions">
+            {micMode === 'ptt' && (
+              <button
+                className={`sh-me-btn${pttHeld ? ' on' : ''}`}
+                type="button"
+                title="按住说话（也可按住空格键）"
+                aria-label="按住说话"
+                aria-pressed={pttHeld}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.setPointerCapture?.(e.pointerId);
+                  onPttHold?.(true);
+                }}
+                onPointerUp={() => onPttHold?.(false)}
+                onPointerCancel={() => onPttHold?.(false)}
+                onPointerLeave={() => onPttHold?.(false)}
+              >
+                <IconMicrophone size="small" />
+              </button>
+            )}
             <VolumePopover
               title="麦克风音量"
               value={micGain}
@@ -875,6 +938,44 @@ export default function ServerHome(props: Props) {
           </div>
           {!notifySupported && (
             <div className="sh-set-hint">当前浏览器不支持桌面通知（需要 HTTPS 或 localhost 打开）。</div>
+          )}
+
+          <div className="files-sub">语音</div>
+          <div className="sh-set-row">
+            <div className="sh-set-row-text">
+              <div className="sh-set-label">说话方式</div>
+              <div className="sh-set-desc">
+                自动：检测到人声才发送；常开：一直发送；按住说话：按住空格键或左栏底部的麦克风按钮时才发送。
+              </div>
+            </div>
+          </div>
+          <div className="sh-mode-group" role="radiogroup" aria-label="说话方式">
+            {(
+              [
+                { id: 'auto', label: '自动' },
+                { id: 'open', label: '常开' },
+                { id: 'ptt', label: '按住说话' },
+              ] as { id: MicMode; label: string }[]
+            ).map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                role="radio"
+                aria-checked={micMode === m.id}
+                className={`sh-mode-btn${micMode === m.id ? ' on' : ''}`}
+                onClick={() => onMicMode?.(m.id)}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {micMode === 'ptt' && (
+            <div className="sh-set-hint sh-ptt-hint">
+              {micOn && micGain > 0
+                ? '按住空格键（或左栏底部麦克风按钮）说话，松开即停止发送。'
+                : '按住说话需先开启麦克风（左栏底部麦克风按钮）。'}
+              {!audioReady && ' 当前浏览器不支持语音编码（需 WebCodecs）。'}
+            </div>
           )}
         </div>
       </SideSheet>

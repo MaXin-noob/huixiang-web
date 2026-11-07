@@ -1170,6 +1170,39 @@
   color: #d97706;
 }
 
+/* 说话方式分段选择 */
+.sh-mode-group {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sh-mode-btn {
+  flex: 1;
+  padding: 7px 0;
+  font-size: 13px;
+  color: var(--sh-text-2);
+  background: var(--sh-field);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sh-mode-btn:hover {
+  background: #eef1f4;
+}
+
+.sh-mode-btn.on {
+  color: var(--sh-brand-deep);
+  background: var(--sh-brand-soft);
+  border-color: var(--sh-brand);
+  font-weight: 500;
+}
+
+.sh-ptt-hint {
+  color: var(--sh-text-3);
+}
+
 /* ---------------- 串流直播标识 ---------------- */
 .sh-live-dot {
   display: inline-block;
