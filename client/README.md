@@ -84,7 +84,7 @@ src/
 
 | 能力 | 需要 |
 |---|---|
-| 语音 | WebCodecs（`AudioDecoder` / `AudioEncoder`）：Chrome/Edge 94+、Safari 16.4+、Firefox 130+ |
+| 语音 | WebCodecs（`AudioDecoder` / `AudioEncoder`）：Chrome/Edge 94+、Firefox 130+、Safari 26+（iOS 26+） |
 | 文字、频道 | 任何现代浏览器 |
 
 不支持 WebCodecs 时页面顶部会提示，文字和频道功能照常可用。

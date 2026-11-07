@@ -384,7 +384,7 @@ sudo systemctl restart huixiang
 | 连不上，浏览器控制台 `WebSocket connection failed`，Nginx 日志 400 | Nginx 缺 `Upgrade` / `Connection` 头 | 对照第 8 节，四个 `proxy_set_header` 一个都不能少 |
 | 页面能开，连服务器时提示「网关拒绝了这次连接」 | Origin 不在白名单，或口令错 | `ALLOWED_ORIGINS` 必须和浏览器地址栏的协议+域名**完全一致**（`https://` 不能写成 `http://`，也不能带路径） |
 | 输入口令后一直进不去 | 口令里有特殊字符被 systemd 解析掉了 | `/etc/huixiang/env` 里给值加双引号：`ACCESS_TOKEN="含特殊字符的口令"` |
-| 能进服务器但听不到声音 | 浏览器不支持 WebCodecs，或对方没说话 | 页头有黄色提示就是浏览器问题；换 Chrome/Edge 94+ |
+| 能进服务器但听不到声音 | 浏览器不支持 WebCodecs，或对方没说话 | 桌面换 Chrome/Edge 94+ 或 Firefox 130+；Safari 需 26+/iOS 26+（iOS 上换浏览器同样无效），旧 iOS 只能用文字和频道 |
 | 自己说话别人听不到 | 没给麦克风权限，或麦克风被静音 | 地址栏左边的图标里看权限 |
 | 连不上任何 TS 服务器 | 服务器出站 UDP 被防火墙拦 | `sudo ufw status`；确认允许出站；或临时 `sudo ufw allow out 9987/udp` |
 | 所有人共用 1 个 IP 被限流（第 5 个人连不上） | Nginx 没传 `X-Forwarded-For` | 检查第 8 节的配置；确认反代和内网在同一台机器 |
@@ -474,5 +474,5 @@ sudo apt install -y openjdk-21-jre-headless
 - 网关是一个 **UDP 代理**：谁能连上它，谁就能让这台服务器替他连任意 TS 服务器。`ACCESS_TOKEN` 是必须的。
 - `ALLOWED_ORIGINS` 挡得住别的网站，**挡不住 `curl`**；口令挡得住没有口令的人，**挡不住拿到口令的人**。要做到"每人独立账号、能封禁、能审计"，那是账号体系，不是加一个 token 的事。
 - 网页关掉连接就断，没有手机 App 那种后台保活。
-- 语音依赖浏览器 WebCodecs：Chrome/Edge 94+、Safari 16.4+、Firefox 130+。低版本只能用文字和频道。
+- 语音依赖浏览器 WebCodecs：Chrome/Edge 94+、Firefox 130+、Safari 26+（iOS 26+）。注意 Safari 16.4–18.x 的 WebCodecs 只有视频、没有音频，iOS 26 之前语音用不了；且 iOS 上所有浏览器都是 WebKit 内核，换 Chrome/Edge 也没用。低版本只能用文字和频道。
 - 单个连接是一个 UDP socket 加一个线程，网关限制全局 96 个、单 IP 4 个。要撑更多人得改架构，不是调参数能解决的。
