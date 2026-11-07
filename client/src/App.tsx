@@ -56,6 +56,24 @@ function gatewayUrl(): string {
   return `${proto}//${location.host}/ws`;
 }
 
+/**
+ * 语音不可用时的提示文案。iOS 上所有浏览器都是 WebKit 内核、换 Chrome/Edge 也没用，
+ * 且 Safari 要到 26（iOS 26）才支持 WebCodecs 音频，所以直接说明真实原因和可用做法。
+ */
+function webCodecsUnsupportedTip(): string {
+  const ua = navigator.userAgent;
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isIOS) {
+    return '这个浏览器不支持 WebCodecs 音频：iOS 需 26 及以上才支持，且 iOS 上所有浏览器（含 Chrome/Edge）都是同一内核、换了也没用。语音暂不可用，文字和频道照常。';
+  }
+  if (/^((?!chrome|android|crios|fxios).)*safari/i.test(ua)) {
+    return '这个浏览器不支持 WebCodecs 音频：Safari 需 26 及以上才支持，旧版请换 Chrome/Edge 94+ 或 Firefox 130+。语音暂不可用，文字和频道照常。';
+  }
+  return '这个浏览器不支持 WebCodecs 音频，请用 Chrome/Edge 94+ 或 Firefox 130+；语音暂不可用，文字和频道照常。';
+}
+
 export default function App() {
   const [tokenNeeded, setTokenNeeded] = useState(false);
   // 口令要求是否已经问过网关。自动恢复登录要等它，否则会拿空口令白连一次。
@@ -229,7 +247,7 @@ export default function App() {
         }
       }
       if (!micCodecAvailable()) {
-        if (!silent) Toast.error('这个浏览器不支持 WebCodecs 音频编码，换 Chrome 或 Edge');
+        if (!silent) Toast.error(webCodecsUnsupportedTip());
         return false;
       }
       const s = stateRef.current;
