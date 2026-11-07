@@ -616,9 +616,12 @@ export default function ServerHome(props: Props) {
                 {hasClients &&
                   !isCollapsed &&
                   members.map((m) => {
-                    // 正在说话：别人靠网关的 talkingIds/m.talking，自己靠本地采集电平 ownTalking
+                    // 正在说话：别人靠网关的 talkingIds/m.talking，自己靠本地采集电平 ownTalking。
+                    // 暂离（away）不算在说话，否则离开状态下说话仍会亮绿点；自己的状态以 state.away 为准。
+                    const away = m.id === state.ownId ? state.away : m.away;
                     const speaking =
-                      m.talking || talkingIds.has(m.id) || (m.id === state.ownId && ownTalking);
+                      !away &&
+                      (m.talking || talkingIds.has(m.id) || (m.id === state.ownId && ownTalking));
                     return (
                     <Popover
                       key={m.id}
