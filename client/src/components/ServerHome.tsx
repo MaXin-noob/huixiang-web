@@ -83,6 +83,8 @@ interface Props {
   /** 成员资料卡：服务器补问回来的公开字段（按 clientId 缓存）。 */
   personDetails?: Record<number, PersonDetails>;
   onPerson?: (clientId: number) => void;
+  /** 戳一戳某个成员（资料卡右上角按钮）。 */
+  onPoke?: (clientId: number) => void;
   /** 成员个人音量（按 uid 记，0–2，0 = 单独静音）。 */
   volumes?: Record<string, number>;
   onMemberVolume?: (member: Member, v: number) => void;
@@ -305,6 +307,7 @@ export default function ServerHome(props: Props) {
     onSetAwayMessage,
     personDetails,
     onPerson,
+    onPoke,
     volumes,
     onMemberVolume,
     fileToken = '',
@@ -638,6 +641,7 @@ export default function ServerHome(props: Props) {
                           details={personDetails?.[m.id]}
                           volume={volumes?.[memberKey(m)] ?? 1}
                           onVolume={(v) => onMemberVolume?.(m, v)}
+                          onPoke={() => onPoke?.(m.id)}
                         />
                       }
                       onVisibleChange={(v) => {

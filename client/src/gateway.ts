@@ -14,6 +14,7 @@ import type {
   FilesMessage,
   HistoryMessage,
   PersonDetails,
+  PokeMessage,
   State,
 } from './protocol';
 import type { StreamEvent } from './stream';
@@ -57,6 +58,8 @@ export interface GatewayHandlers {
   onServerPing?: (ms: number) => void;
   /** 某人的资料卡补充字段（点了头像才查）；服务器可能什么都不给。 */
   onPerson?: (person: PersonDetails) => void;
+  /** 有人戳了戳我。 */
+  onPoke?: (poke: PokeMessage) => void;
   /** 服务端关了连接：1008 多半是口令不对或来源不被允许。 */
   onClose?: (code: number, reason: string) => void;
   onError?: (message: string) => void;
@@ -203,6 +206,9 @@ export class Gateway {
           case 'person':
             this.handlers.onPerson?.(m as unknown as PersonDetails);
             break;
+          case 'poke':
+            this.handlers.onPoke?.(m as unknown as PokeMessage);
+            break;
         }
       };
 
@@ -303,6 +309,11 @@ export class Gateway {
   /** 要某人的资料卡补充字段（服务器公开的那部分）；答案从 `onPerson` 回来。 */
   requestPerson(clid: number) {
     this.send({ t: 'person', clid });
+  }
+
+  /** 戳一戳某个在线成员（结果从 onChanOp 回来）。 */
+  poke(clid: number, msg = '') {
+    this.send({ t: 'poke', clid, msg });
   }
 
   setMuted(input: boolean, output: boolean) {

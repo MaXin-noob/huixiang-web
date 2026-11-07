@@ -14,6 +14,8 @@ interface Props {
   /** 个人音量（0–2，0 = 单独静音），缺省 1。 */
   volume?: number;
   onVolume?: (v: number) => void;
+  /** 戳一戳这个人（右上角按钮）；不传则不显示，自己的卡片也不显示。 */
+  onPoke?: () => void;
 }
 
 /**
@@ -28,6 +30,7 @@ export default function UserCard({
   avatarToken,
   volume = 1,
   onVolume,
+  onPoke,
 }: Props) {
   const me = member.id === ownId;
   const groups = [member.channelGroup, ...member.serverGroups].filter((g) => !!g && g.trim().length > 0);
@@ -59,6 +62,21 @@ export default function UserCard({
             {member.priority && <span className="uc-badge uc-priority">优先发言人</span>}
           </div>
         </div>
+        {!me && onPoke && (
+          <button type="button" className="uc-poke" onClick={onPoke} title="戳一戳">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M12 3v10m0 0l3-3m-3 3l-3-3"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path d="M4.5 15.5v1.8A4.7 4.7 0 009.2 22h5.6a4.7 4.7 0 004.7-4.7v-1.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            戳一戳
+          </button>
+        )}
       </div>
 
       <dl className="user-card-rows">

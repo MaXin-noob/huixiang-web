@@ -179,6 +179,15 @@ export interface ChatLine {
   mine?: boolean;
 }
 
+/** 有人戳了戳我（notifyclientpoke）；不进聊天记录，只弹一条提示。 */
+export interface PokeMessage {
+  t: 'poke';
+  from: number;
+  name: string;
+  uid?: string;
+  msg?: string;
+}
+
 /** 网关回来的那一页频道历史；只有网关连着这个服务器时收过消息才有。 */
 export interface HistoryMessage {
   t: 'history';

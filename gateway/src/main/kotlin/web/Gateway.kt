@@ -782,6 +782,8 @@ private fun onText(session: WebSession, text: String, ip: String) {
         }
         "away" -> session.setAway(m["away"] == true, (m["message"] as? String).orEmpty())
         "person" -> session.personDetails((m["clid"] as? Number)?.toInt() ?: return)
+        // 戳一戳：给某个在线成员发一条 clientpoke，结果以 chanOp 回页面（成功/失败提示）。
+        "poke" -> session.poke((m["clid"] as? Number)?.toInt() ?: return, (m["msg"] as? String).orEmpty())
         "channel" -> onChannel(session, m)
         "stream" -> onStream(session, m)
         "file" -> onFile(session, m)
