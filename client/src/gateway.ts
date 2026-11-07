@@ -212,8 +212,11 @@ export class Gateway {
         this.stopPing();
         if (!settled) {
           settled = true;
-          const why = e.code === 1008 ? '网关拒绝了这次连接（口令或来源不被允许）' : e.reason || `连接关闭 ${e.code}`;
-          reject(new Error(why));
+          const why = e.code === 1008 ? '网关访问口令不正确，请核对后重试' : e.reason || `连接关闭 ${e.code}`;
+          const err = new Error(why) as Error & { code?: number };
+          // 带上关闭码，调用方据此判断「这次失败 onClose 是否已经报过」，避免重复提示
+          err.code = e.code;
+          reject(err);
         }
         this.handlers.onClose?.(e.code, e.reason ?? '');
       };

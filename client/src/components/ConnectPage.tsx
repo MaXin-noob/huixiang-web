@@ -298,12 +298,15 @@ export default function ConnectPage({
 
   useEffect(() => {
     if (!loggingInRef.current) return;
-    if (signedIn || account.error) {
+    // 登录尝试到此结束就该复位：账号登录成功（signedIn）、myTeamSpeak 报错（account.error），
+    // 或者网关这层先失败了（比如网关口令不对，error 有值）。不带上 error 的话，口令错误时
+    // 不会产生 account.error，按钮会一直「正在登录…」直到 15 秒兜底，看着就像卡死。
+    if (signedIn || account.error || error) {
       loggingInRef.current = false;
       setLoggingIn(false);
       closeLoginToast();
     }
-  }, [signedIn, account]);
+  }, [signedIn, account, error]);
 
   const submitLogin = () => {
     if (signedIn) {

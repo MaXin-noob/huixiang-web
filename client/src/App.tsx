@@ -488,7 +488,7 @@ export default function App() {
           else Toast.error(`${r.label}失败：${r.error ?? '未知错误'}`);
         },
         onPerson: (p) => setPersonDetails((prev) => ({ ...prev, [p.id]: p })),
-        onClose: (code, reason) => {
+        onClose: (code) => {
           // 掉线/关页前记一笔开关，重连后恢复
           {
             const s = stateRef.current;
@@ -510,7 +510,7 @@ export default function App() {
           setCloud(emptyCloud());
           setCloudChat(null);
           setCloudNotice(null);
-          if (code === 1008) setError(reason || '网关拒绝了这次连接');
+          if (code === 1008) setError('网关访问口令不正确，请核对后重试');
         },
       });
       gatewayRef.current = g;
@@ -586,7 +586,10 @@ export default function App() {
         g.connect(opts);
       } catch (e) {
         setConnecting(false);
-        setError(e instanceof Error ? e.message : String(e));
+        // 1008（网关口令不对）已由 onClose 统一报错，这里不再重复；其余（如连不上网关）补一条
+        if ((e as { code?: number })?.code !== 1008) {
+          setError((prev) => prev ?? (e instanceof Error ? e.message : String(e)));
+        }
       }
     },
     [ensurePlayer, talking, openGateway],
@@ -632,7 +635,10 @@ export default function App() {
         g.accountLogin(email, password, otp);
       } catch (e) {
         setAccount(guestAccount());
-        Toast.error(e instanceof Error ? e.message : String(e));
+        // 1008（网关口令不对）已由 onClose 统一报错，这里不再重复弹提示；其余（如连不上网关）补一条
+        if ((e as { code?: number })?.code !== 1008) {
+          setError((prev) => prev ?? (e instanceof Error ? e.message : String(e)));
+        }
       }
     },
     [openGateway, token, tokenNeeded],
