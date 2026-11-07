@@ -43,6 +43,9 @@ export class VoicePlayer {
   private people = new Map<number, Person>();
   private volumes = new Map<number, number>();
   private broken = false;
+  /** 扬声器总音量（0–2），静音时临时归零，取消静音后回到这个值。 */
+  private outputVolume = 1;
+  private muted = false;
 
   constructor(private readonly onLevel?: (clientId: number, level: number) => void) {
     this.ctx = createAudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
@@ -56,7 +59,14 @@ export class VoicePlayer {
   }
 
   setMuted(muted: boolean) {
-    this.master.gain.value = muted ? 0 : 1;
+    this.muted = muted;
+    this.master.gain.value = muted ? 0 : this.outputVolume;
+  }
+
+  /** 扬声器总音量；静音状态下只记值，不覆盖静音。 */
+  setOutputVolume(volume: number) {
+    this.outputVolume = clampGain(volume);
+    if (!this.muted) this.master.gain.value = this.outputVolume;
   }
 
   setVolume(clientId: number, volume: number) {
@@ -89,6 +99,9 @@ export class VoicePlayer {
   /** 一帧 Opus。空帧表示这个人停止说话了。 */
   play(clientId: number, codec: number, opus: Uint8Array) {
     if (this.broken) return;
+    // 浏览器可能因为自动播放策略一直把 AudioContext 挂在 suspended：出声前先尝试恢复，
+    // 否则要等用户随手拖一下音量（触发手势）才听得到别人说话。
+    if (this.ctx.state === 'suspended') void this.ctx.resume();
     if (opus.length === 0) return;
     const Chunk = EncodedAudioChunkCtor;
     if (!Chunk || !AudioDecoderCtor) return;

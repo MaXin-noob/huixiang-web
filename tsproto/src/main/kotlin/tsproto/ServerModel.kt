@@ -162,6 +162,15 @@ class ServerModel {
                 val id = g["cid"]?.toIntOrNull() ?: continue
                 channels[id] = channelFrom(g, channels[id] ?: Channel(id, 0, 0, "Channel $id"))
             }
+            // Reply to `channelgetdescription`: the plain channellist carries no description, so we ask per channel.
+            "channelgetdescription" -> {
+                val id = cmd["cid"]?.toIntOrNull() ?: return false
+                val ch = channels[id] ?: return false
+                val d = cmd["channel_description"] ?: return false
+                if (ch.description == d) return false
+                channels[id] = ch.copy(description = d)
+                return true
+            }
             // A new channel: the one that came after its place now comes after it (the server doesn't say so)
             "notifychannelcreated" -> for (g in cmd.groups) {
                 val id = g["cid"]?.toIntOrNull() ?: continue

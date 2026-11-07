@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Input, Spin } from '@douyinfe/semi-ui';
+import { Spin } from '@douyinfe/semi-ui';
 import { IconClose, IconRefresh } from '@douyinfe/semi-icons';
 import type {
   AccountState,
@@ -11,6 +11,7 @@ import type {
   Member,
 } from '../protocol';
 import { avatarSources } from '../ui';
+import './friends-wechat.css';
 
 interface Props {
   open: boolean;
@@ -73,8 +74,42 @@ function clock(ms: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** 微信风格的底部输入区：工具栏图标 + 多行输入 + 发送按钮。 */
+function Composer({
+  value,
+  onChange,
+  onSend,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSend: () => void;
+}) {
+  return (
+    <div className="wx-compose">
+      <div className="wx-input-row">
+        <textarea
+          className="wx-input"
+          value={value}
+          rows={1}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              onSend();
+            }
+          }}
+          placeholder="发消息…"
+        />
+        <button type="button" className="wx-send" onClick={onSend} disabled={!value.trim()}>
+          发送
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /**
- * 好友抽屉：左边联系人，点进去是一对一会话。
+ * 好友抽屉（微信风格）：左侧会话列表 + 右侧聊天区。
  *
  * 两条路自动选：
  * - 对方正连在**当前服务器**上 → 走 TeamSpeak 服务器的私聊（sendtextmessage targetmode=1），
@@ -187,171 +222,184 @@ export default function FriendsPanel({
   };
 
   const chatTitle = selected?.name || viewing?.name || '';
+  const ownTitle = account.username || '我';
+  const ownAvatar = <FriendAvatar name={ownTitle} src={accountAvatar || undefined} />;
+  const peerAvatar = selected ? (
+    <FriendAvatar matrixId={selected.matrixId} name={chatTitle} src={avatarSrcOf(selected)} />
+  ) : null;
 
   return (
     <>
       <div className="friends-scrim" onClick={onClose} />
-      <aside className="friends-drawer" role="dialog" aria-label="好友">
-        <div className="friends-head">
-          {selected ? (
-            <button type="button" className="friends-back" onClick={() => setSelected(null)}>
-              ‹ 好友
-            </button>
-          ) : (
+      <aside className="friends-drawer wx" role="dialog" aria-label="好友">
+        {/* 左：会话列表 */}
+        <div className="wx-sidebar">
+          <div className="wx-sidebar-head">
             <span className="friends-title">好友</span>
-          )}
-          <div className="friends-head-actions">
-            {viewing && !serverMode && (
-              <button
-                type="button"
-                className="icon-btn"
-                title="刷新"
-                onClick={() => viewing.roomId && onHistory(viewing.roomId)}
-              >
-                <IconRefresh size="small" />
-              </button>
-            )}
             <button type="button" className="icon-btn" title="关闭" onClick={onClose}>
               <IconClose size="small" />
             </button>
           </div>
+
+          {!signedIn ? (
+            <div className="friends-empty">登录 myTeamSpeak 后即可使用好友聊天。</div>
+          ) : (
+            <>
+              {cloud.phase === 'connecting' && (
+                <div className="friends-status">
+                  <Spin size="small" /> 正在连接云端聊天…
+                </div>
+              )}
+              {cloud.phase === 'error' && (
+                <div className="friends-status friends-status-error">
+                  <span>{cloud.errorText || '云端聊天连接失败'}</span>
+                  <button type="button" className="friends-retry" onClick={onConnect}>
+                    重试
+                  </button>
+                </div>
+              )}
+              {notice && cloud.phase !== 'connecting' && (
+                <div className="friends-notice">
+                  {notice}
+                  <button type="button" className="friends-notice-x" onClick={onDismissNotice}>
+                    <IconClose size="small" />
+                  </button>
+                </div>
+              )}
+              {friends.loading && friends.items.length === 0 ? (
+                <div className="friends-status">
+                  <Spin size="small" /> 正在加载好友…
+                </div>
+              ) : friends.items.length === 0 ? (
+                <div className="friends-empty">
+                  {friends.error ? friends.error : '还没有好友。在 myTeamSpeak 里加了好友就会出现在这里。'}
+                </div>
+              ) : (
+                <div className="friends-list">
+                  {friends.items.map((f) => {
+                    const online = onlineOf(f) != null;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className={`friend-row${selected?.id === f.id ? ' is-active' : ''}`}
+                        onClick={() => pick(f)}
+                      >
+                        <FriendAvatar matrixId={f.matrixId} name={f.name} src={avatarSrcOf(f)} />
+                        <span className="friend-text">
+                          <span className="friend-name">{f.name}</span>
+                          {f.subtitle && <span className="friend-sub">{f.subtitle}</span>}
+                        </span>
+                        <span className={`friend-online${online ? ' is-on' : ''}`}>
+                          {online ? '在线' : '云聊天'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {cloud.connected && friends.items.length > 0 && (
+                <button type="button" className="friends-disconnect" onClick={onDisconnect}>
+                  断开云端聊天
+                </button>
+              )}
+            </>
+          )}
         </div>
 
-        {!signedIn ? (
-          <div className="friends-empty">登录 myTeamSpeak 后即可使用好友聊天。</div>
-        ) : selected && serverMode ? (
-          <>
-            <div className="friends-chat-head">
-              <FriendAvatar matrixId={selected.matrixId} name={selected.name} src={avatarSrcOf(selected)} />
-              <span className="friends-chat-name">{chatTitle}</span>
-              <span className="friends-chat-mode">在线 · 服务器私聊</span>
-            </div>
-            <div className="friends-messages" ref={listRef}>
-              {serverMsgs.length === 0 && (
-                <div className="friends-chat-empty">还没有消息，打个招呼吧</div>
-              )}
-              {serverMsgs.map((l, i) => {
-                const mine = l.mine ?? l.from === ownId;
-                return (
-                  <div key={`${l.time}-${i}`} className={`friends-msg${mine ? ' is-mine' : ''}`}>
-                    <div className="friends-bubble">{l.text}</div>
-                    <div className="friends-time">{clock(l.time)}</div>
+        {/* 右：聊天区 */}
+        <div className="wx-chat">
+          {!selected ? (
+            <div className="wx-chat-placeholder">选择一个好友开始聊天</div>
+          ) : (
+            <>
+              <div className="friends-chat-head">
+                {peerAvatar}
+                <span className="friends-chat-name">{chatTitle}</span>
+                <span className="friends-chat-mode">
+                  {serverMode ? '在线 · 服务器私聊' : viewing ? '不在本服务器 · 云聊天' : ''}
+                </span>
+                <span className="wx-chat-head-spacer" />
+                {viewing && !serverMode && (
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    title="刷新"
+                    onClick={() => viewing.roomId && onHistory(viewing.roomId)}
+                  >
+                    <IconRefresh size="small" />
+                  </button>
+                )}
+              </div>
+
+              {serverMode ? (
+                <>
+                  <div className="friends-messages" ref={listRef}>
+                    {serverMsgs.length === 0 && (
+                      <div className="friends-chat-empty">还没有消息，打个招呼吧</div>
+                    )}
+                    {serverMsgs.map((l, i) => {
+                      const mine = l.mine ?? l.from === ownId;
+                      return (
+                        <div key={`${l.time}-${i}`} className={`wx-msg${mine ? ' is-mine' : ''}`}>
+                          {mine ? ownAvatar : peerAvatar}
+                          <div className="wx-msg-body">
+                            <div className="wx-msg-name">{mine ? '' : chatTitle}</div>
+                            <div className="wx-bubble">{l.text}</div>
+                            <div className="wx-msg-time">{clock(l.time)}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-            <div className="friends-compose">
-              <Input value={draft} onChange={setDraft} placeholder="发消息…" onEnterPress={submit} />
-              <button type="button" className="friends-send" onClick={submit} disabled={!draft.trim()}>
-                发送
-              </button>
-            </div>
-          </>
-        ) : selected && viewing ? (
-          <>
-            <div className="friends-chat-head">
-              <FriendAvatar matrixId={selected?.matrixId || viewing.peer || undefined} name={chatTitle} src={avatarSrcOf(selected)} />
-              <span className="friends-chat-name">{chatTitle}</span>
-              <span className="friends-chat-mode">不在本服务器 · 云聊天</span>
-            </div>
-            <div className="friends-messages" ref={listRef}>
-              {viewing.more && (
-                <button
-                  type="button"
-                  className="friends-more"
-                  onClick={() => viewing.roomId && onHistory(viewing.roomId)}
-                >
-                  加载更早的消息
-                </button>
-              )}
-              {viewing.messages.length === 0 && (
-                <div className="friends-chat-empty">还没有消息，打个招呼吧</div>
-              )}
-              {viewing.messages.map((m) => {
-                const mine = m.sender === cloud.userId;
-                return (
-                  <div key={m.id} className={`friends-msg${mine ? ' is-mine' : ''}`}>
-                    <div className="friends-bubble">{m.body}</div>
-                    <div className="friends-time">{clock(m.time)}</div>
+                  <Composer value={draft} onChange={setDraft} onSend={submit} />
+                </>
+              ) : viewing ? (
+                <>
+                  <div className="friends-messages" ref={listRef}>
+                    {viewing.more && (
+                      <button
+                        type="button"
+                        className="friends-more"
+                        onClick={() => viewing.roomId && onHistory(viewing.roomId)}
+                      >
+                        加载更早的消息
+                      </button>
+                    )}
+                    {viewing.messages.length === 0 && (
+                      <div className="friends-chat-empty">还没有消息，打个招呼吧</div>
+                    )}
+                    {viewing.messages.map((m) => {
+                      const mine = m.sender === cloud.userId;
+                      return (
+                        <div key={m.id} className={`wx-msg${mine ? ' is-mine' : ''}`}>
+                          {mine ? ownAvatar : peerAvatar}
+                          <div className="wx-msg-body">
+                            <div className="wx-msg-name">{mine ? '' : chatTitle}</div>
+                            <div className="wx-bubble">{m.body}</div>
+                            <div className="wx-msg-time">{clock(m.time)}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-            {notice && <div className="friends-notice">{notice}</div>}
-            {viewing.encrypted ? (
-              <div className="friends-locked">这是端到端加密会话，网页版暂不支持收发。</div>
-            ) : (
-              <div className="friends-compose">
-                <Input value={draft} onChange={setDraft} placeholder="发消息…" onEnterPress={submit} />
-                <button type="button" className="friends-send" onClick={submit} disabled={!draft.trim()}>
-                  发送
-                </button>
-              </div>
-            )}
-          </>
-        ) : selected ? (
-          <div className="friends-body">
-            <div className="friends-status">
-              <Spin size="small" /> 正在打开与 {chatTitle} 的会话…
-            </div>
-          </div>
-        ) : (
-          <div className="friends-body">
-            {cloud.phase === 'connecting' && (
-              <div className="friends-status">
-                <Spin size="small" /> 正在连接云端聊天…
-              </div>
-            )}
-            {cloud.phase === 'error' && (
-              <div className="friends-status friends-status-error">
-                <span>{cloud.errorText || '云端聊天连接失败'}</span>
-                <button type="button" className="friends-retry" onClick={onConnect}>
-                  重试
-                </button>
-              </div>
-            )}
-            {notice && cloud.phase !== 'connecting' && (
-              <div className="friends-notice">
-                {notice}
-                <button type="button" className="friends-notice-x" onClick={onDismissNotice}>
-                  <IconClose size="small" />
-                </button>
-              </div>
-            )}
-            {friends.loading && friends.items.length === 0 ? (
-              <div className="friends-status">
-                <Spin size="small" /> 正在加载好友…
-              </div>
-            ) : friends.items.length === 0 ? (
-              <div className="friends-empty">
-                {friends.error ? friends.error : '还没有好友。在 myTeamSpeak 里加了好友就会出现在这里。'}
-              </div>
-            ) : (
-              <div className="friends-list">
-                {friends.items.map((f) => {
-                  const online = onlineOf(f) != null;
-                  return (
-                    <button key={f.id} type="button" className="friend-row" onClick={() => pick(f)}>
-                      <FriendAvatar matrixId={f.matrixId} name={f.name} src={avatarSrcOf(f)} />
-                      <span className="friend-text">
-                        <span className="friend-name">{f.name}</span>
-                        {f.subtitle && <span className="friend-sub">{f.subtitle}</span>}
-                      </span>
-                      <span className={`friend-online${online ? ' is-on' : ''}`}>
-                        {online ? '在线' : '云聊天'}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {cloud.connected && friends.items.length > 0 && (
-              <button type="button" className="friends-disconnect" onClick={onDisconnect}>
-                断开云端聊天
-              </button>
-            )}
-          </div>
-        )}
+                  {notice && <div className="friends-notice">{notice}</div>}
+                  {viewing.encrypted ? (
+                    <div className="friends-locked">这是端到端加密会话，网页版暂不支持收发。</div>
+                  ) : (
+                    <Composer value={draft} onChange={setDraft} onSend={submit} />
+                  )}
+                </>
+              ) : (
+                <div className="friends-body">
+                  <div className="friends-status">
+                    <Spin size="small" /> 正在打开与 {chatTitle} 的会话…
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </aside>
     </>
   );

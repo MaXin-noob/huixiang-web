@@ -237,7 +237,7 @@ export class Gateway {
     for (const s of items) this.ws?.send(s);
   }
 
-  /** 每两秒探一次浏览器 ↔ 网关的往返；只有连上之后才探，免得占着队列。 */
+  /** 每秒探一次浏览器 ↔ 网关的往返；只有连上之后才探，免得占着队列。 */
   private startPing() {
     if (this.pingTimer != null) return;
     const probe = () => {
@@ -251,7 +251,7 @@ export class Gateway {
       this.send({ t: 'ping', v: id });
     };
     probe();
-    this.pingTimer = window.setInterval(probe, 2000);
+    this.pingTimer = window.setInterval(probe, 1000);
   }
 
   private stopPing() {

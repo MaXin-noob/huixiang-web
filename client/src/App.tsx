@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Toast } from '@douyinfe/semi-ui';
 import { Gateway, tokenRequired } from './gateway';
 import {
+  accountNickname,
   eachMember,
   emptyBookmarks,
   emptyCloud,
@@ -39,7 +40,7 @@ import { avatarSources } from './ui';
 import { VoicePlayer, webCodecsAvailable } from './audio/player';
 import { MicSender, micCodecAvailable } from './audio/mic';
 import ConnectPage from './components/ConnectPage';
-import ServerPage from './components/ServerPage';
+import ServerHome from './components/ServerHome';
 import PresenceToasts, { type PresenceNotice } from './components/PresenceToasts';
 
 const MAX_CHAT = 300;
@@ -94,6 +95,9 @@ export default function App() {
 
   // 音量都是本地增益：上行改编码前的 PCM，下行改每个人的播放节点，服务器不参与
   const [micGain, setMicGain] = useState(() => store.micGain());
+  const [outputGain, setOutputGain] = useState(() => store.outputGain());
+  const outputGainRef = useRef(outputGain);
+  outputGainRef.current = outputGain;
   const [volumes, setVolumes] = useState<Record<string, number>>(() => store.volumes());
 
   // 说话方式：自动（检测到人声才发）/ 常开 / 按住说话，默认自动，存本地
@@ -133,7 +137,7 @@ export default function App() {
   const playerRef = useRef<VoicePlayer | null>(null);
   const micRef = useRef<MicSender | null>(null);
   const streamRef = useRef<StreamClient | null>(null);
-  const lastAddress = useRef<{ address: string; nickname: string } | null>(null);
+  const lastAddress = useRef<{ address: string; nickname: string; guest?: boolean } | null>(null);
   // 回调里要读最新状态，不能靠闭包
   const stateRef = useRef<State | null>(null);
 
@@ -187,11 +191,26 @@ export default function App() {
       playerRef.current = new VoicePlayer((clientId, level) => {
         if (level > TALK_LEVEL) talking.heard(clientId);
       });
+      // 建好播放器就按当前扬声器音量与静音态落地：音量为 0 视为静音，否则保持出声。
+      playerRef.current.setOutputVolume(outputGainRef.current);
+      playerRef.current.setMuted(outputGainRef.current === 0);
       setAudioReady(webCodecsAvailable());
     }
     playerRef.current.resume();
     return playerRef.current;
   }, [talking]);
+
+  // 浏览器的自动播放策略会把手势之前创建的 AudioContext 挂起。用户在页面上的第一次
+  // 点击/按键都算手势，统一拿它把播放器唤醒一次，避免「进服后听不到、要先动音量」。
+  useEffect(() => {
+    const unlock = () => playerRef.current?.resume();
+    window.addEventListener('pointerdown', unlock, { capture: true });
+    window.addEventListener('keydown', unlock, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock, true);
+      window.removeEventListener('keydown', unlock, true);
+    };
+  }, []);
 
   /**
    * 打开麦克风并开始发送。silent=true 用于「进服时自动恢复上次开麦状态」：
@@ -323,12 +342,14 @@ export default function App() {
           }
           const prevPhase = stateRef.current?.phase;
           let st = s;
-          // 进服/重连时：若 14 天内有「上次离开时的开关」，就按它恢复；否则默认闭麦、扬声器沿用服务器状态。
+          // 进服/重连时：麦克风在没有本地采集前先按闭麦（交由 startMic 恢复），
+          // 扬声器静音只看当前保存的音量是否为 0，不沿用上次离开时的开关。
           if (s.phase === 'connected' && prevPhase !== 'connected') {
-            const pref = store.mutePref();
             // 麦克风：本地采集没起来前一律先按闭麦，真正开麦由下面 startMic 成功后翻成不静音
             const wantInputMuted = micRef.current ? s.inputMuted : true;
-            const wantOutputMuted = pref ? pref.outputMuted : s.outputMuted;
+            // 输出静音只由「扬声器音量是否为 0」决定，不再沿用上次离开时的静音开关，
+            // 否则一旦上次是静音、这次一进来就听不到别人，还得手动动一下音量才恢复。
+            const wantOutputMuted = outputGainRef.current === 0;
             st = { ...st, inputMuted: wantInputMuted, outputMuted: wantOutputMuted };
           }
           // 频道成员进出提示：拿这一份快照跟上一份「我所在频道」的成员比。
@@ -533,7 +554,7 @@ export default function App() {
       setPing({ gateway: null, server: null });
       // 记住的是「用户自己的昵称」：登录时连进来用的是账号名，退出登录后重连还要回到自定义昵称
       const remembered = opts.nickname === store.nickname() ? opts.nickname : store.nickname() || opts.nickname;
-      lastAddress.current = { address: opts.host, nickname: remembered };
+      lastAddress.current = { address: opts.host, nickname: remembered, guest: opts.guest };
       setChat([]);
       try {
         ensurePlayer();
@@ -556,10 +577,10 @@ export default function App() {
   const connect = useCallback(
     (opts: ConnectOptions) => {
       if (tokenNeeded) store.setToken(token);
-      // 登录状态下昵称强制用账号名；只有真的用了用户自己的昵称才写回本地，
-      // 免得账号名覆盖掉 huixiang.nickname，退出登录后自定义昵称就没了
-      const nickname = effectiveNickname(account, opts.nickname);
-      if (nickname === opts.nickname) store.setNickname(opts.nickname);
+      // 游客登录始终用用户自己填的昵称，哪怕已登录 myTeamSpeak；账号登录在已登录时强制用账号名。
+      // 只有真正用的是用户自己的昵称才写回本地，免得账号名覆盖掉 huixiang.nickname
+      const nickname = opts.guest ? opts.nickname : effectiveNickname(account, opts.nickname);
+      if (opts.guest || !accountNickname(account)) store.setNickname(opts.nickname);
       void doConnect({ ...opts, nickname, identity: store.identity() }, tokenNeeded ? token : '');
     },
     [account, doConnect, token, tokenNeeded],
@@ -572,9 +593,10 @@ export default function App() {
       {
         host: last.address,
         port: 9987,
-        nickname: effectiveNickname(account, last.nickname),
+        nickname: last.guest ? last.nickname : effectiveNickname(account, last.nickname),
         password: '',
         identity: store.identity(),
+        guest: last.guest,
       },
       tokenNeeded ? token : '',
     );
@@ -784,6 +806,38 @@ export default function App() {
     setMicGain(g);
     store.setMicGain(g);
     micRef.current?.setVolume(g);
+    // 用户第一次拖音量也是一次手势，顺手把被浏览器挂起的播放器唤醒
+    playerRef.current?.resume();
+    // 音量即静音：拖到 0 就告诉服务器「我静音了」，拉回来自动解除。
+    const s = stateRef.current;
+    const wantMuted = g === 0;
+    if (s && s.inputMuted !== wantMuted) {
+      const st = { ...s, inputMuted: wantMuted };
+      stateRef.current = st;
+      setState(st);
+      gatewayRef.current?.setMuted(wantMuted, st.outputMuted);
+      store.setMutePref(wantMuted, st.outputMuted);
+    }
+  }, []);
+
+  /** 扬声器总音量：改下行总线增益，立刻生效，并记住下次。 */
+  const changeOutputGain = useCallback((v: number) => {
+    const g = clampGain(v);
+    setOutputGain(g);
+    store.setOutputGain(g);
+    playerRef.current?.resume();
+    playerRef.current?.setOutputVolume(g);
+    // 音量即静音：拖到 0 本地静音，拉回来自动解除（以音量为准）。
+    const muted = g === 0;
+    playerRef.current?.setMuted(muted);
+    const s = stateRef.current;
+    if (s && s.outputMuted !== muted) {
+      const st = { ...s, outputMuted: muted };
+      stateRef.current = st;
+      setState(st);
+      gatewayRef.current?.setMuted(st.inputMuted, muted);
+      store.setMutePref(st.inputMuted, muted);
+    }
   }, []);
 
   /** 个人音量：按 uid 记住，他换频道、重连回来还是这个音量。 */
@@ -883,6 +937,10 @@ export default function App() {
     (member: Member, reason: string) => gatewayRef.current?.kickClient(member.id, false, reason),
     [],
   );
+  const kickFromChannel = useCallback(
+    (member: Member, reason: string) => gatewayRef.current?.kickClient(member.id, true, reason),
+    [],
+  );
   const banMember = useCallback(
     (member: Member, seconds: number, reason: string) => gatewayRef.current?.banClient(member.id, seconds, reason),
     [],
@@ -910,7 +968,7 @@ export default function App() {
       );
     }
     return (
-      <ServerPage
+      <ServerHome
         state={state}
         chat={visibleChat}
         allChat={chat}
@@ -940,6 +998,7 @@ export default function App() {
         micOn={micOn}
         micLevel={micLevel}
         micGain={micGain}
+        outputGain={outputGain}
         volumes={volumes}
         talkingIds={voiceTalking}
         ownTalking={ownTalking}
@@ -962,6 +1021,7 @@ export default function App() {
         onListFiles={listFiles}
         onRename={rename}
         onMicGain={changeMicGain}
+        onOutputGain={changeOutputGain}
         onMemberVolume={changeMemberVolume}
         onToggleInput={toggleInput}
         onToggleOutput={toggleOutput}
@@ -976,6 +1036,7 @@ export default function App() {
         onEditChannel={editChannel}
         onDeleteChannel={deleteChannel}
         onKickMember={kickMember}
+        onKickFromChannel={kickFromChannel}
         onBanMember={banMember}
         personDetails={personDetails}
         onPerson={requestPerson}
@@ -1003,6 +1064,7 @@ export default function App() {
     micOn,
     micLevel,
     micGain,
+    outputGain,
     volumes,
     voiceTalking,
     ownTalking,
@@ -1023,6 +1085,7 @@ export default function App() {
     listFiles,
     rename,
     changeMicGain,
+    changeOutputGain,
     changeMemberVolume,
     toggleInput,
     toggleOutput,
@@ -1047,6 +1110,7 @@ export default function App() {
     editChannel,
     deleteChannel,
     kickMember,
+    kickFromChannel,
     banMember,
     personDetails,
     requestPerson,

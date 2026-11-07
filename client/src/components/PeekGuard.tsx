@@ -118,6 +118,8 @@ export default function PeekGuard({ guard }: { guard: boolean }) {
               top: blob.top,
               background: blob.color,
               borderRadius: 'calc(var(--blob-w) * 0.44 * var(--peek-scale))',
+              // 把身体颜色也传下去，给「眼皮」那层用（眨眼时盖住眼珠）
+              ['--blob-color' as string]: blob.color,
               // CSS 变量把倾斜角传下去，捂眼时整体再往外转一圈
               ['--blob-tilt' as string]: `${blob.tilt}deg`,
             }}

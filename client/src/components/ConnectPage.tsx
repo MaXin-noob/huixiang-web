@@ -3,7 +3,6 @@ import { Input, Toast } from '@douyinfe/semi-ui';
 import { IconGlobe, IconKey, IconLock, IconServer, IconUser } from '@douyinfe/semi-icons';
 import { accountErrorText } from '../account';
 import {
-  accountNickname,
   effectiveNickname,
   store,
   type AccountState,
@@ -190,14 +189,12 @@ export default function ConnectPage({
   const [mode, setMode] = useState<Mode>('account');
   // 捂眼：只要光标落在密码类输入框里，右边的小家伙就集体避开视线
   const [hiding, setHiding] = useState(false);
-  const lastAutoNick = useRef('');
   const recent = useMemo(() => store.recent(), []);
   const parsed = parseAddress(address);
   // 网关刚退出登录时会推一条「已登录但没名字」的中间态，别拿它当登录成功
   const signedIn = account.phase === 'signedIn' && !!(account.username || account.email);
-  // 已登录时昵称固定是账号名，输入框只做展示；游客才用自己填的昵称
-  const accountNick = accountNickname(account);
-  const nick = effectiveNickname(account, nickname);
+  // 账号登录取账号名；游客登录始终用用户自己填的昵称，哪怕已登录 myTeamSpeak
+  const nick = mode === 'guest' ? nickname : effectiveNickname(account, nickname);
   const canConnect = !!parsed && nick.trim().length > 0 && (!tokenNeeded || token.trim().length > 0) && agreed;
   const accountBusy = account.phase === 'busy';
   // 账号页签只填账号、密码、口令（要网关口令的话），协议勾上就能点「登录」；
@@ -222,27 +219,6 @@ export default function ConnectPage({
       setAddress(recent[0]);
     }
   }, [recent, address]);
-
-  // 登录后默认用账号昵称；用户自己改过就保留。
-  useEffect(() => {
-    if (account.phase !== 'signedIn' || !account.username) {
-      if (account.phase !== 'signedIn') lastAutoNick.current = '';
-      return;
-    }
-    const name = account.username;
-    setNickname((prev) => {
-      if (!prev.trim() || prev === lastAutoNick.current) {
-        lastAutoNick.current = name;
-        return name;
-      }
-      return prev;
-    });
-  }, [account.phase, account.username]);
-
-  // 登录成功后自动停到账号页签，方便直接挑云书签
-  useEffect(() => {
-    if (account.phase === 'signedIn') setMode('account');
-  }, [account.phase]);
 
   // 需要两步验证时，网关会说 208/209；把验证码输入框露出来。
   useEffect(() => {
@@ -311,6 +287,7 @@ export default function ConnectPage({
       nickname: nick.trim(),
       password,
       identity: store.identity(),
+      guest: mode === 'guest',
     });
   };
 
@@ -667,9 +644,7 @@ export default function ConnectPage({
                     onChange={setNickname}
                     onEnterPress={submit}
                     maxLength={30}
-                    disabled={!!accountNick}
                   />
-                  {!!accountNick && <span className="login-hint">已登录 myTeamSpeak，将以账号名进入</span>}
                 </div>
 
                 <div className="login-field">{addressField}</div>

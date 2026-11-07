@@ -9,53 +9,29 @@ interface Props {
   ownId: number;
   accountAvatar: string;
   avatarToken: string;
-  /** 服务器补问回来的公开字段；还没拿到就先只显示本地快照。 */
+  /** 服务器补问回来的公开字段（保留参数，卡片暂不展示）。 */
   details?: PersonDetails;
+  /** 个人音量（0–2，0 = 单独静音），缺省 1。 */
+  volume?: number;
+  onVolume?: (v: number) => void;
 }
-
-/** 连接时长：秒（连接时刻）→「1 天 2 小时」「3 小时 5 分」「12 分钟」。 */
-function duration(startedAt: number, now: number): string {
-  if (!startedAt || startedAt <= 0) return '';
-  const total = Math.max(0, now - startedAt);
-  const d = Math.floor(total / 86400);
-  const h = Math.floor((total % 86400) / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  if (d > 0) return `${d} 天 ${h} 小时`;
-  if (h > 0) return `${h} 小时 ${m} 分`;
-  return `${Math.max(1, m)} 分钟`;
-}
-
-/** 地区码 → 中文名（常见几个；其余原样显示）。 */
-const COUNTRY: Record<string, string> = {
-  CN: '中国',
-  HK: '香港',
-  TW: '台湾',
-  MO: '澳门',
-  US: '美国',
-  JP: '日本',
-  KR: '韩国',
-  SG: '新加坡',
-  GB: '英国',
-  DE: '德国',
-  FR: '法国',
-  CA: '加拿大',
-  AU: '澳大利亚',
-  RU: '俄罗斯',
-};
 
 /**
- * 用户资料卡：悬停在头像上时浮出来的一张小卡片。
- * 只用「服务器已经告诉我们的事」：快照里的昵称/身份组/状态 + 点开时补问到的客户端信息。
- * 服务器不给的字段不瞎猜，缺就整行不显示。
+ * 用户资料卡：悬停在成员上时浮出来的一张小卡片。
+ * 只显示「频道、身份组、音量」三项；音量按 uid 记，0 = 单独静音这个人。
  */
-export default function UserCard({ member, channelName, ownId, accountAvatar, avatarToken, details }: Props) {
+export default function UserCard({
+  member,
+  channelName,
+  ownId,
+  accountAvatar,
+  avatarToken,
+  volume = 1,
+  onVolume,
+}: Props) {
   const me = member.id === ownId;
   const groups = [member.channelGroup, ...member.serverGroups].filter((g) => !!g && g.trim().length > 0);
-  const client = [details?.platform, details?.version].filter((s) => !!s && s.trim().length > 0).join(' ');
-  const online = duration(details?.connectionTime ?? 0, Date.now());
-  const country = details?.country
-    ? (COUNTRY[details.country.toUpperCase()] ?? details.country)
-    : '';
+  const pct = Math.round(Math.min(2, Math.max(0, volume)) * 100);
 
   return (
     <div className="user-card">
@@ -87,12 +63,6 @@ export default function UserCard({ member, channelName, ownId, accountAvatar, av
 
       <dl className="user-card-rows">
         <div className="uc-row">
-          <dt>UID</dt>
-          <dd className="uc-uid" title={member.uid}>
-            {member.uid || '—'}
-          </dd>
-        </div>
-        <div className="uc-row">
           <dt>频道</dt>
           <dd>{channelName || '—'}</dd>
         </div>
@@ -108,33 +78,25 @@ export default function UserCard({ member, channelName, ownId, accountAvatar, av
             </dd>
           </div>
         )}
-        {client && (
-          <div className="uc-row">
-            <dt>客户端</dt>
-            <dd>{client}</dd>
-          </div>
-        )}
-        {country && (
-          <div className="uc-row">
-            <dt>地区</dt>
-            <dd>{country}</dd>
-          </div>
-        )}
-        {online && (
-          <div className="uc-row">
-            <dt>在线</dt>
-            <dd>{online}</dd>
-          </div>
-        )}
-        {member.talkPower !== 0 && (
-          <div className="uc-row">
-            <dt>说话权</dt>
-            <dd>{member.talkPower}</dd>
+        {!me && (
+          <div className="uc-row uc-vol">
+            <dt>音量</dt>
+            <dd>
+              <input
+                className="uc-vol-range"
+                type="range"
+                min={0}
+                max={200}
+                step={5}
+                value={pct}
+                onChange={(e) => onVolume?.(Number(e.target.value) / 100)}
+                aria-label="个人音量"
+              />
+              <span className="uc-vol-pct">{pct}%</span>
+            </dd>
           </div>
         )}
       </dl>
-
-      {details?.description && <div className="user-card-desc">{details.description}</div>}
     </div>
   );
 }
