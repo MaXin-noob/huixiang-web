@@ -1,0 +1,675 @@
+/* 自动生成：Semi Button 化后恢复原有按钮样式（覆盖 .semi-button 默认与 .sh-shell button 重置） */
+.login-tab.semi-button {
+  flex: 1 1 0;
+  height: 40px;
+  border: none;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.login-tab:hover.semi-button {
+  color: var(--text-2);
+}
+.login-tab.is-active.semi-button {
+  background: var(--bg-panel);
+  color: var(--text-1);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(21, 23, 28, 0.08);
+}
+.login-submit.semi-button {
+  height: 48px;
+  margin-top: 8px;
+  border: none;
+  border-radius: 24px;
+  background: var(--login-accent);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.login-submit:hover:not(:disabled).semi-button {
+  background: #009a24;
+  box-shadow: 0 6px 16px rgba(0, 180, 42, 0.28);
+}
+.login-submit:disabled.semi-button {
+  background: #c9cdd4;
+  cursor: not-allowed;
+}
+.login-reveal.semi-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color 0.16s ease;
+}
+.login-reveal:hover.semi-button {
+  color: var(--text-1);
+}
+.field-link.login-otp-link.semi-button {
+  color: var(--login-accent-ink);
+  padding: 0;
+}
+.field-link.login-otp-link:hover.semi-button {
+  color: #005f16;
+}
+.login-social.semi-button {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color 0.16s ease;
+}
+.login-social:hover.semi-button {
+  color: var(--text-1);
+}
+.field-link.semi-button {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #5a38e0;
+  /* 被挤到输入框右边时不能折行，否则「显示」会竖着摆 */
+  white-space: nowrap;
+  cursor: pointer;
+}
+.field-link:hover.semi-button {
+  color: var(--brand-deep);
+}
+.recent-item.semi-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px 0 12px;
+  border-radius: 999px;
+  border: none;
+  background: var(--bg-fill);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.recent-item:hover.semi-button {
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+}
+.icon-btn.semi-button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.icon-btn:hover.semi-button {
+  background: var(--bg-fill);
+  color: var(--text-1);
+}
+.stream-btn.semi-button {
+  height: 26px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.stream-btn:hover.semi-button {
+  background: rgba(255, 255, 255, 0.26);
+}
+.files-crumb.semi-button {
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text-3);
+  cursor: pointer;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.files-crumb:hover:not(:disabled).semi-button {
+  background: var(--bg-fill);
+  color: var(--text-1);
+}
+.files-crumb.is-here.semi-button {
+  color: var(--text-1);
+  font-weight: 600;
+  cursor: default;
+}
+.files-icon.is-folder.semi-button {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.files-name.semi-button {
+  font-size: 13px;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+button.files-name.semi-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+button.files-name:hover.semi-button {
+  color: var(--brand);
+}
+.saved-item.semi-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--bg-fill);
+  color: var(--text-3);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.saved-item:hover.semi-button {
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+}
+.friends-retry.semi-button {
+  border: 1px solid var(--line);
+  background: var(--bg-app);
+  color: var(--text-2);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.friends-retry:hover.semi-button {
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+}
+.friend-row.semi-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.friend-row:hover.semi-button {
+  background: var(--bg-fill);
+}
+.friends-disconnect.semi-button {
+  margin: 12px 8px 4px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.friends-disconnect:hover.semi-button {
+  color: var(--danger);
+  border-color: var(--danger-soft);
+  background: var(--danger-soft);
+}
+.friends-more.semi-button {
+  align-self: center;
+  border: none;
+  background: var(--bg-fill);
+  color: var(--text-3);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.friends-notice-x.semi-button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px;
+}
+.files-act.semi-button {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.files-row:hover .files-act.semi-button {
+  opacity: 1;
+}
+.files-act:hover:not(:disabled).semi-button {
+  background: var(--bg-fill-2);
+  color: var(--text-1);
+}
+.files-act.is-danger:hover:not(:disabled).semi-button {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.files-act:disabled.semi-button {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+@media (hover: none) {.files-act.semi-button {
+    opacity: 1;
+  }}
+.uc-poke.semi-button {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+  background: rgba(0, 0, 0, 0.05);
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.uc-poke:hover.semi-button {
+  background: rgba(0, 0, 0, 0.09);
+  color: var(--text-1);
+}
+.uc-poke:active.semi-button {
+  transform: scale(0.96);
+}
+.stream-btn-text.semi-button {
+  min-width: 76px;
+  padding: 0 18px;
+}
+.sh-more-btn.semi-button {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--sh-olive);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+.sh-more-btn:hover.semi-button {
+  background: rgba(107, 124, 52, 0.12);
+}
+.sh-status-search.semi-button {
+  margin-left: auto;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sh-olive);
+  border: none;
+  background: transparent;
+}
+.sh-sec-plus.semi-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--sh-text-4);
+  border: none;
+  background: transparent;
+}
+.sh-sec-plus:hover.semi-button {
+  color: var(--sh-text-2);
+}
+.sh-chan.semi-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px 0 4px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--sh-text-2);
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+.sh-chan:hover.semi-button {
+  background: rgba(0, 0, 0, 0.035);
+}
+.sh-chan.selected.semi-button {
+  background: var(--sh-brand-soft);
+}
+.sh-me-btn.semi-button {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sh-text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.sh-me-btn:hover.semi-button {
+  background: var(--sh-field);
+}
+.sh-me-btn.on.semi-button {
+  background: var(--sh-brand-soft);
+  color: var(--sh-brand-deep);
+}
+.sh-icon-btn.semi-button {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: var(--sh-field);
+  color: var(--sh-text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.sh-icon-btn:hover.semi-button {
+  background: #eceef1;
+}
+.sh-tool-btn.semi-button {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--sh-icon-gray);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.sh-tool-btn:hover.semi-button {
+  color: var(--sh-text-2);
+}
+.sh-send-btn.semi-button {
+  height: 32px;
+  min-width: 64px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: #22c55e;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.sh-send-btn:hover:not(:disabled).semi-button {
+  background: #16a34a;
+}
+.sh-send-btn:disabled.semi-button {
+  background: #f4f5f7;
+  color: #c2c7d0;
+  cursor: default;
+}
+.sh-emoji-item.semi-button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 6px 0;
+  border-radius: 8px;
+  transition: background 0.12s ease;
+}
+.sh-emoji-item:hover.semi-button {
+  background: var(--sh-field);
+}
+.sh-more-close.semi-button {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: none;
+  color: var(--sh-text-3);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sh-more-close:hover.semi-button {
+  background: var(--sh-field);
+  color: var(--sh-text-2);
+}
+.sh-copy.semi-button {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--sh-brand-deep);
+  font-size: 12.5px;
+}
+.sh-copy:hover.semi-button {
+  text-decoration: underline;
+}
+.sh-leave.semi-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 14px;
+  height: 38px;
+  border: none;
+  border-radius: 10px;
+  background: #fcecec;
+  color: #d9363e;
+  font-size: 13px;
+  font-weight: 500;
+}
+.sh-leave:hover.semi-button {
+  background: #f9dcdc;
+}
+.sh-btn-ghost.semi-button {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--sh-line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--sh-text-2);
+  font-size: 13px;
+}
+.sh-btn-primary.semi-button {
+  height: 34px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 9px;
+  background: var(--sh-brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+}
+.sh-btn-primary:hover.semi-button {
+  background: var(--sh-brand-deep);
+}
+.sh-mode-btn.semi-button {
+  flex: 1;
+  padding: 7px 0;
+  font-size: 13px;
+  color: var(--sh-text-2);
+  background: var(--sh-field);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.sh-mode-btn:hover.semi-button {
+  background: #eef1f4;
+}
+.sh-mode-btn.on.semi-button {
+  color: var(--sh-brand-deep);
+  background: var(--sh-brand-soft);
+  border-color: var(--sh-brand);
+  font-weight: 500;
+}
+.sh-member-live.semi-button {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 10px;
+  font-weight: 600;
+  color: #ef4444;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sh-member-live:hover.semi-button {
+  color: #dc2626;
+  text-decoration: underline;
+}
+.sh-icon-btn.is-live.semi-button {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+.sh-btn-danger.semi-button {
+  height: 34px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 9px;
+  background: #d9363e;
+  color: #fff;
+  font-size: 13px;
+}
+.sh-btn-danger:hover.semi-button {
+  background: #c22b33;
+}
+.friends-drawer.wx .friend-row.semi-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: auto;
+  min-height: 64px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+.friends-drawer.wx .friend-row:hover.semi-button {
+  background: #ececec;
+}
+.friends-drawer.wx .friend-row.is-active.semi-button {
+  background: #d7f5c6;
+}
+.friends-drawer.wx .friends-disconnect.semi-button {
+  flex: 0 0 auto;
+  margin: 8px 14px 12px;
+  min-height: 52px;
+  padding: 0 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.friends-drawer.wx .friends-more.semi-button {
+  align-self: center;
+  border: none;
+  background: rgba(0, 0, 0, 0.05);
+  color: #6b6b6b;
+  border-radius: 10px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+.friends-drawer.wx .wx-send.semi-button {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 6px;
+  background: #07c160;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.friends-drawer.wx .wx-send:hover:not(:disabled).semi-button {
+  background: #06ad56;
+}
+.friends-drawer.wx .wx-send:disabled.semi-button {
+  background: #e2e2e2;
+  color: #b0b0b0;
+  cursor: default;
+}

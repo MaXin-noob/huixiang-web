@@ -1,3 +1,4 @@
+import { Button, Slider } from '@douyinfe/semi-ui';
 import type { Member, PersonDetails } from '../protocol';
 import { avatarSources } from '../ui';
 import UserAvatar from './UserAvatar';
@@ -65,7 +66,7 @@ export default function UserCard({
           </div>
         </div>
         {!me && onPoke && (
-          <button type="button" className="uc-poke" onClick={onPoke} title="戳一戳">
+          <Button htmlType="button" className="uc-poke btn-semi" onClick={onPoke} title="戳一戳">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
                 d="M12 3v10m0 0l3-3m-3 3l-3-3"
@@ -77,7 +78,7 @@ export default function UserCard({
               <path d="M4.5 15.5v1.8A4.7 4.7 0 009.2 22h5.6a4.7 4.7 0 004.7-4.7v-1.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
             戳一戳
-          </button>
+          </Button>
         )}
       </div>
 
@@ -102,14 +103,13 @@ export default function UserCard({
           <div className="uc-row uc-vol">
             <dt>音量</dt>
             <dd>
-              <input
+              <Slider
                 className="uc-vol-range"
-                type="range"
                 min={0}
                 max={200}
                 step={5}
                 value={pct}
-                onChange={(e) => onVolume?.(Number(e.target.value) / 100)}
+                onChange={(value) => onVolume?.(Number(value) / 100)}
                 aria-label="个人音量"
               />
               <span className="uc-vol-pct">{pct}%</span>

@@ -1,3 +1,4 @@
+import { Button } from '@douyinfe/semi-ui';
 import {
   useCallback,
   useEffect,
@@ -145,18 +146,18 @@ export default function StreamPanel({ stream, streamerName, ownName, onStopShare
           </span>
           {subtitle && <span className="stream-sub">{subtitle}</span>}
           <span className="stream-spacer" />
-          <button
-            type="button"
-            className="stream-btn stream-btn-text"
+          <Button
+            htmlType="button"
+            className="stream-btn stream-btn-text btn-semi"
             onClick={toggleFullscreen}
             title={fullscreen ? '退出全屏（也可以按 Esc）' : '全屏看（双击画面也行）'}
           >
             {fullscreen ? '退出全屏' : '全屏'}
-          </button>
+          </Button>
           {watching && (
-            <button
-              type="button"
-              className="stream-btn stream-btn-text"
+            <Button
+              htmlType="button"
+              className="stream-btn stream-btn-text btn-semi"
               onClick={() => {
                 const v = videoRef.current;
                 const next = !muted;
@@ -167,15 +168,15 @@ export default function StreamPanel({ stream, streamerName, ownName, onStopShare
               aria-pressed={muted}
             >
               {muted ? <IconVolumnSilent /> : <IconVolume2 />}
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
-            className="stream-btn stream-btn-text"
+          <Button
+            htmlType="button"
+            className="stream-btn stream-btn-text btn-semi"
             onClick={watching ? onStopWatch : onStopShare}
           >
             {watching ? '关掉' : '停止直播'}
-          </button>
+          </Button>
         </div>
       </div>
 

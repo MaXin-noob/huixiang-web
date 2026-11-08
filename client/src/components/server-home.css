@@ -211,6 +211,38 @@
   border-color: var(--sh-brand);
 }
 
+/* Semi Input：搜索框（className 落在 wrapper 上，输入框本身铺满） */
+.sh-search.semi-input-wrapper {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  padding: 0 12px;
+}
+
+.sh-search.semi-input-wrapper .semi-input {
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+}
+
+.sh-search.semi-input-wrapper:focus-within,
+.sh-search.semi-input-wrapper.semi-input-wrapper-focus {
+  border-color: var(--sh-brand);
+}
+
+.sh-search-inline.semi-input-wrapper {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
 /* 搜索框内联在状态行里，覆盖在线/延迟两个 pill */
 .sh-search-inline {
   flex: 1 1 auto;
@@ -902,6 +934,22 @@
   color: var(--sh-text-4);
 }
 
+.sh-composer-input .semi-input-textarea {
+  height: 100%;
+  min-height: 69px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: inherit;
+}
+
+.sh-composer-input .semi-input-textarea::placeholder {
+  color: var(--sh-text-4);
+}
+
 .sh-composer-tools {
   display: flex;
   align-items: center;
@@ -1224,6 +1272,22 @@
   border-color: var(--sh-brand);
 }
 
+.sh-modal-input.semi-input-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.sh-modal-input.semi-input-wrapper .semi-input {
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  outline: none;
+}
+
 .sh-modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -1321,6 +1385,57 @@
 }
 
 .sh-mode-btn.on {
+  color: var(--sh-brand-deep);
+  background: var(--sh-brand-soft);
+  border-color: var(--sh-brand);
+  font-weight: 500;
+}
+
+/* Semi RadioGroup 承载说话方式三档：隐藏圆点，把文字做成原分段按钮 */
+.sh-mode-group.semi-radioGroup {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.sh-mode-group .semi-radio {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  display: block;
+  background: transparent;
+  border: none;
+}
+.sh-mode-group .semi-radio .semi-radio-inner {
+  display: none;
+}
+.sh-mode-group .semi-radio .semi-radio-content {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+.sh-mode-group .semi-radio .semi-radio-addon-buttonRadio {
+  display: block;
+  width: 100%;
+  padding: 7px 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--sh-text-2);
+  background: var(--sh-field);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.sh-mode-group .semi-radio:hover .semi-radio-addon-buttonRadio {
+  background: #eef1f4;
+}
+.sh-mode-group .semi-radio .semi-radio-addon-buttonRadio-checked {
   color: var(--sh-brand-deep);
   background: var(--sh-brand-soft);
   border-color: var(--sh-brand);
@@ -1542,12 +1657,165 @@
   background: #fff;
 }
 
+/* Semi Input / TextArea / InputNumber：外层 wrapper 直接充当原来的控件盒子 */
+.sh-form-input.semi-input-wrapper,
+.sh-form-input.semi-input-number {
+  display: flex;
+  align-items: center;
+}
+
+.sh-form-input.semi-input-wrapper .semi-input,
+.sh-form-input.semi-input-number .semi-input-number-input {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  color: inherit;
+  outline: none;
+}
+
+.sh-form-input.semi-input-number .semi-input-number-input {
+  text-align: left;
+}
+
+/* InputNumber 内部还有一层 semi-input-wrapper，需要与最外层控件盒合并 */
+.sh-form-input.semi-input-number .semi-input-wrapper {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sh-form-input.semi-input-number .semi-input {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  color: inherit;
+  outline: none;
+}
+
+.sh-form-input.semi-input-wrapper-focus,
+.sh-form-input.semi-input-number-focus,
+.sh-form-input.semi-input-number:focus-within {
+  border-color: var(--sh-brand);
+  background: #fff;
+}
+
+/* Semi Select：频道表单下拉 */
+.sh-form-select.semi-select {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  border: 1px solid var(--sh-line);
+  border-radius: 9px;
+  background: var(--sh-field);
+  font-size: 13.5px;
+  color: var(--sh-text-1);
+}
+
+.sh-form-select.semi-select:hover {
+  background: var(--sh-field);
+}
+
+.sh-form-select.semi-select.semi-select-focus {
+  border-color: var(--sh-brand);
+  background: #fff;
+}
+
+.sh-form-select.semi-select .semi-select-selection {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 4px 0 10px;
+}
+
+.sh-form-select.semi-select .semi-select-selection-text {
+  font-size: 13.5px;
+  color: var(--sh-text-1);
+}
+
 .sh-form-textarea {
   height: auto;
   min-height: 58px;
   padding: 8px 10px;
   resize: vertical;
   line-height: 1.5;
+}
+
+.sh-form-textarea.semi-input-textarea-wrapper {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  min-height: 58px;
+  padding: 8px 10px;
+  border: 1px solid var(--sh-line);
+  border-radius: 9px;
+  background: var(--sh-field);
+  font-size: 13.5px;
+  color: var(--sh-text-1);
+  resize: vertical;
+}
+
+/* 覆盖 Semi 的 borderless 透明背景/边框（其选择器带 :not(:hover)，需要更高特异性） */
+.sh-form-textarea.semi-input-textarea-wrapper.semi-input-textarea-borderless,
+.sh-form-textarea.semi-input-textarea-wrapper.semi-input-textarea-borderless:hover {
+  background-color: var(--sh-field);
+  border-color: var(--sh-line);
+}
+
+.sh-form-textarea.semi-input-textarea-wrapper.semi-input-textarea-borderless:focus-within {
+  background-color: #fff;
+  border-color: var(--sh-brand);
+}
+
+.sh-form-textarea.semi-input-textarea-wrapper .semi-input-textarea {
+  height: 100%;
+  min-height: 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: inherit;
+  resize: vertical;
+}
+
+.sh-form-inline > .semi-slider {
+  flex: 1;
+  min-width: 0;
+  --semi-color-primary: var(--sh-brand);
+}
+
+.sh-form-inline .semi-slider-handle {
+  width: 14px;
+  height: 14px;
+  margin-top: 0;
+  margin-left: -7px;
+  background: var(--sh-brand);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.sh-form-inline .semi-slider-handle:hover {
+  background: var(--sh-brand);
+}
+
+.sh-form-range.semi-slider-wrapper {
+  width: 100%;
 }
 
 .sh-form-inline {
@@ -1583,6 +1851,45 @@
   padding-top: 7px;
   font-size: 13.5px;
   color: var(--sh-text-2);
+}
+
+/* Semi Checkbox：频道表单密码勾选 */
+.sh-form-check.semi-checkbox {
+  align-items: center;
+  column-gap: 8px;
+}
+
+.sh-form-check.semi-checkbox .semi-checkbox-inner,
+.sh-form-check.semi-checkbox .semi-checkbox-inner-display {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sh-form-check.semi-checkbox .semi-checkbox-inner-display .semi-icon {
+  width: 10px;
+  height: 10px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.sh-form-check.semi-checkbox .semi-checkbox-addon {
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: 20px;
+  color: inherit;
+}
+
+.sh-form-check.semi-checkbox .semi-checkbox-inner-display {
+  border-radius: 4px;
+}
+
+.sh-form-check.semi-checkbox.semi-checkbox-checked .semi-checkbox-inner-display {
+  border-color: var(--sh-brand);
+  background-color: var(--sh-brand);
+  box-shadow: none;
 }
 
 .sh-btn-danger {

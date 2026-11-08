@@ -1,5 +1,6 @@
-// 频道进出的轻提示：固定右下角、堆叠、几秒自动消失，不打断操作。
-// 纯展示组件，队列的增删由 App 负责（见 App.tsx 里 diffPresence 的调用处）。
+// 频道进出的轻提示：改用 Semi Notification 展示，队列仍由 App 负责。
+import { useEffect, useRef } from 'react';
+import { Notification } from '@douyinfe/semi-ui';
 
 export interface PresenceNotice {
   id: number;
@@ -8,15 +9,30 @@ export interface PresenceNotice {
 }
 
 export default function PresenceToasts({ items }: { items: PresenceNotice[] }) {
-  if (!items.length) return null;
-  return (
-    <div className="presence-toasts" aria-live="polite" aria-atomic="false">
-      {items.map((it) => (
-        <div key={it.id} className={`presence-toast presence-${it.kind}`}>
-          <span className="presence-dot" aria-hidden="true" />
-          <span className="presence-text">{it.text}</span>
-        </div>
-      ))}
-    </div>
-  );
+  const shown = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    for (const it of items) {
+      if (shown.current.has(it.id)) continue;
+      shown.current.add(it.id);
+      Notification.open({
+        content: (
+          <span className="presence-line">
+            <span className={`presence-dot presence-${it.kind}`} aria-hidden="true" />
+            <span className="presence-text">{it.text}</span>
+          </span>
+        ),
+        duration: 3,
+        position: 'bottomRight',
+        theme: 'normal',
+        showClose: false,
+        className: 'presence-notification',
+      });
+    }
+    for (const id of Array.from(shown.current)) {
+      if (!items.some((it) => it.id === id)) shown.current.delete(id);
+    }
+  }, [items]);
+
+  return null;
 }

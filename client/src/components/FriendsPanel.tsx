@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Spin } from '@douyinfe/semi-ui';
+import { Button, SideSheet, Spin, TextArea, Avatar as SemiAvatar } from '@douyinfe/semi-ui';
 import { IconClose, IconRefresh } from '@douyinfe/semi-icons';
 import type {
   AccountState,
@@ -50,22 +50,22 @@ function initial(name: string): string {
 function FriendAvatar({ matrixId, name, src }: { matrixId?: string; name: string; src?: string }) {
   const [broken, setBroken] = useState(false);
   const [brokenMatrix, setBrokenMatrix] = useState(false);
-  if (src && !broken) {
-    return (
-      <span className="friend-avatar">
-        <img src={src} alt="" onError={() => setBroken(true)} />
-      </span>
-    );
-  }
-  const url = matrixId ? `/cloud-avatar/${encodeURIComponent(matrixId)}` : '';
-  if (url && !brokenMatrix) {
-    return (
-      <span className="friend-avatar">
-        <img src={url} alt="" onError={() => setBrokenMatrix(true)} />
-      </span>
-    );
-  }
-  return <span className="friend-avatar">{initial(name)}</span>;
+  const matrixUrl = matrixId ? `/cloud-avatar/${encodeURIComponent(matrixId)}` : '';
+  const imageSrc = src && !broken ? src : matrixUrl && !brokenMatrix ? matrixUrl : undefined;
+  return (
+    <SemiAvatar
+      className="friend-avatar"
+      shape="circle"
+      src={imageSrc}
+      alt=""
+      onError={() => {
+        if (imageSrc === src) setBroken(true);
+        else setBrokenMatrix(true);
+      }}
+    >
+      {initial(name)}
+    </SemiAvatar>
+  );
 }
 
 function clock(ms: number): string {
@@ -87,11 +87,12 @@ function Composer({
   return (
     <div className="wx-compose">
       <div className="wx-input-row">
-        <textarea
+        <TextArea
           className="wx-input"
           value={value}
           rows={1}
-          onChange={(e) => onChange(e.target.value)}
+          borderless
+          onChange={(next) => onChange(next)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
@@ -100,9 +101,9 @@ function Composer({
           }}
           placeholder="发消息…"
         />
-        <button type="button" className="wx-send" onClick={onSend} disabled={!value.trim()}>
+        <Button htmlType="button" className="wx-send btn-semi" onClick={onSend} disabled={!value.trim()}>
           发送
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -229,16 +230,23 @@ export default function FriendsPanel({
   ) : null;
 
   return (
-    <>
-      <div className="friends-scrim" onClick={onClose} />
-      <aside className="friends-drawer wx" role="dialog" aria-label="好友">
+    <SideSheet
+      visible={open}
+      onCancel={onClose}
+      placement="right"
+      width="50vw"
+      className="friends-sheet"
+      headerStyle={{ display: 'none' }}
+      bodyStyle={{ padding: 0, height: '100%', overflow: 'hidden' }}
+    >
+      <div className="friends-drawer wx" role="dialog" aria-label="好友">
         {/* 左：会话列表 */}
         <div className="wx-sidebar">
           <div className="wx-sidebar-head">
             <span className="friends-title">好友</span>
-            <button type="button" className="icon-btn" title="关闭" onClick={onClose}>
+            <Button htmlType="button" className="icon-btn btn-semi" title="关闭" onClick={onClose}>
               <IconClose size="small" />
-            </button>
+            </Button>
           </div>
 
           {!signedIn ? (
@@ -253,17 +261,17 @@ export default function FriendsPanel({
               {cloud.phase === 'error' && (
                 <div className="friends-status friends-status-error">
                   <span>{cloud.errorText || '云端聊天连接失败'}</span>
-                  <button type="button" className="friends-retry" onClick={onConnect}>
+                  <Button htmlType="button" className="friends-retry btn-semi" onClick={onConnect}>
                     重试
-                  </button>
+                  </Button>
                 </div>
               )}
               {notice && cloud.phase !== 'connecting' && (
                 <div className="friends-notice">
                   {notice}
-                  <button type="button" className="friends-notice-x" onClick={onDismissNotice}>
+                  <Button htmlType="button" className="friends-notice-x btn-semi" onClick={onDismissNotice}>
                     <IconClose size="small" />
-                  </button>
+                  </Button>
                 </div>
               )}
               {friends.loading && friends.items.length === 0 ? (
@@ -279,10 +287,10 @@ export default function FriendsPanel({
                   {friends.items.map((f) => {
                     const online = onlineOf(f) != null;
                     return (
-                      <button
+                      <Button
                         key={f.id}
-                        type="button"
-                        className={`friend-row${selected?.id === f.id ? ' is-active' : ''}`}
+                        htmlType="button"
+                        className={`friend-row${selected?.id === f.id ? ' is-active' : ''} btn-semi`}
                         onClick={() => pick(f)}
                       >
                         <FriendAvatar matrixId={f.matrixId} name={f.name} src={avatarSrcOf(f)} />
@@ -293,15 +301,15 @@ export default function FriendsPanel({
                         <span className={`friend-online${online ? ' is-on' : ''}`}>
                           {online ? '在线' : '云聊天'}
                         </span>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
               )}
               {cloud.connected && friends.items.length > 0 && (
-                <button type="button" className="friends-disconnect" onClick={onDisconnect}>
+                <Button htmlType="button" className="friends-disconnect btn-semi" onClick={onDisconnect}>
                   断开云端聊天
-                </button>
+                </Button>
               )}
             </>
           )}
@@ -321,14 +329,14 @@ export default function FriendsPanel({
                 </span>
                 <span className="wx-chat-head-spacer" />
                 {viewing && !serverMode && (
-                  <button
-                    type="button"
-                    className="icon-btn"
+                  <Button
+                    htmlType="button"
+                    className="icon-btn btn-semi"
                     title="刷新"
                     onClick={() => viewing.roomId && onHistory(viewing.roomId)}
                   >
                     <IconRefresh size="small" />
-                  </button>
+                  </Button>
                 )}
               </div>
 
@@ -358,13 +366,13 @@ export default function FriendsPanel({
                 <>
                   <div className="friends-messages" ref={listRef}>
                     {viewing.more && (
-                      <button
-                        type="button"
-                        className="friends-more"
+                      <Button
+                        htmlType="button"
+                        className="friends-more btn-semi"
                         onClick={() => viewing.roomId && onHistory(viewing.roomId)}
                       >
                         加载更早的消息
-                      </button>
+                      </Button>
                     )}
                     {viewing.messages.length === 0 && (
                       <div className="friends-chat-empty">还没有消息，打个招呼吧</div>
@@ -400,7 +408,7 @@ export default function FriendsPanel({
             </>
           )}
         </div>
-      </aside>
-    </>
+      </div>
+    </SideSheet>
   );
 }
