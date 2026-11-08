@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import {
   Button,
   Avatar as SemiAvatar,
@@ -74,6 +74,9 @@ import UserCard from './UserCard';
 import ChannelIcon from './ChannelIcon';
 import FilesPanel from './FilesPanel';
 import FriendsPanel from './FriendsPanel';
+import ChatAttachment from './ChatAttachment';
+import { encodeAttachment, parseAttachment, type ChatAttachmentInfo } from '../chatAttach';
+import { formatBytes, uploadFile } from '../files';
 import './server-home.css';
 
 /** AIChatDialogue 的角色元数据：聊天记录里所有成员都按 user 角色渲染。 */
@@ -91,6 +94,10 @@ interface Props {
   onLoadMoreChat: () => void;
   avatarToken: string;
   account: AccountState;
+  /** 上传 / 更换 myTeamSpeak 账号头像（文件选择后交给 account.ts 压图并 POST）。 */
+  onAvatarChange?: (file: File) => void | Promise<void>;
+  /** 删除 myTeamSpeak 账号头像。 */
+  onAvatarRemove?: () => void | Promise<void>;
   /** 浏览器 ↔ 网关的 WebSocket 往返（ms），未知为 null。 */
   pingGateway: number | null;
   /** 网关 ↔ TeamSpeak 的 UDP 往返（ms），未知为 null。 */
@@ -373,6 +380,8 @@ export default function ServerHome(props: Props) {
     onLoadMoreChat,
     avatarToken,
     account,
+    onAvatarChange,
+    onAvatarRemove,
     pingGateway,
     pingServer,
     micOn,
@@ -441,6 +450,9 @@ export default function ServerHome(props: Props) {
   const [query, setQuery] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 设置页里的账号头像：隐藏的文件选择框、上传/删除进行中的标志（防重复点击）。
+  const avatarFileRef = useRef<HTMLInputElement | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [pwChannel, setPwChannel] = useState<ChannelNode | null>(null);
   const [pwValue, setPwValue] = useState('');
   // 频道管理：新建/编辑表单、删除确认、行内「更多」菜单。
@@ -454,10 +466,13 @@ export default function ServerHome(props: Props) {
   const [filesOpen, setFilesOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [attachBusy, setAttachBusy] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   /** 移动端：频道页 / 聊天页。桌面端由 CSS 忽略，不影响双栏布局。 */
   const [mobilePane, setMobilePane] = useState<'channels' | 'chat'>('channels');
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const dlgRef = useRef<AIChatDialogue | null>(null);
 
@@ -733,6 +748,67 @@ export default function ServerHome(props: Props) {
     setEmojiOpen(false);
   };
 
+  /** 选文件前先挡住不能传的情况，避免用户点了没反应。 */
+  const pickAttachment = (kind: 'image' | 'file') => {
+    if (!connected) {
+      Toast.error('还没连上服务器');
+      return;
+    }
+    if (!fileToken) {
+      Toast.error('文件功能尚未就绪，请稍后重试');
+      return;
+    }
+    (kind === 'image' ? imageInputRef : fileInputRef).current?.click();
+  };
+
+  /**
+   * 上传一个文件到当前频道的文件区，再发一条带附件标记的消息。
+   * 字节走 HTTP（和文件面板同一套端点、同一个会话令牌），文本走 say，别的客户端也能看到文件名。
+   */
+  const sendAttachment = async (file: File, kind: 'image' | 'file') => {
+    if (!connected) {
+      Toast.error('还没连上服务器');
+      return;
+    }
+    if (!fileToken) {
+      Toast.error('文件功能尚未就绪，请稍后重试');
+      return;
+    }
+    const MAX_ATTACH = 100 * 1024 * 1024;
+    if (file.size > MAX_ATTACH) {
+      Toast.error(`${file.name} 超过 100 MB，请换个小一点的文件`);
+      return;
+    }
+    setAttachBusy(true);
+    // 根目录下用时间戳前缀防重名；去掉路径分隔符等非法字符，免得网关拒绝。
+    const stamp = Date.now().toString(36);
+    const safe = file.name.replace(/[\\/:*?"<>|]/g, '_') || 'file';
+    const path = `/${stamp}-${safe}`;
+    try {
+      await uploadFile({ token: fileToken, cid: state.ownChannel, path, file });
+      const att: ChatAttachmentInfo = {
+        cid: state.ownChannel,
+        path,
+        name: file.name,
+        size: file.size,
+        kind,
+      };
+      // 第一行给人看（别的 TS 客户端也能显示），第二行是本应用解析用的标记。
+      const label = kind === 'image' ? '🖼️' : '📎';
+      onSay(`${label} ${file.name}（${formatBytes(file.size)}）\n${encodeAttachment(att)}`);
+    } catch (e: unknown) {
+      Toast.error(`${file.name}：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setAttachBusy(false);
+    }
+  };
+
+  const onAttachmentPicked = (e: ChangeEvent<HTMLInputElement>, kind: 'image' | 'file') => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) void sendAttachment(file, kind);
+  };
+
   /** 好友/云聊天入口：按钮一直显示；访客点击提示需登录 myTeamSpeak 账号。 */
   const openFriends = () => {
     if (account.phase !== 'signedIn') {
@@ -759,6 +835,37 @@ export default function ServerHome(props: Props) {
   const banner = info?.bannerUrl ?? null;
 
   const ownMember = findMember(state.tree, state.ownId);
+
+  // 设置页「个人资料」：点头像区的按钮触发隐藏的 file input；选中图片后交给上层压图上传。
+  const pickAvatar = () => avatarFileRef.current?.click();
+  const onAvatarFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // 清空，允许再次选择同一张图
+    if (!file) return;
+    setAvatarBusy(true);
+    try {
+      await onAvatarChange?.(file);
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+  const confirmRemoveAvatar = () => {
+    Modal.confirm({
+      title: '删除账号头像',
+      content: '删除后将以昵称首字母显示，确定删除吗？',
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { type: 'danger' },
+      onOk: async () => {
+        setAvatarBusy(true);
+        try {
+          await onAvatarRemove?.();
+        } finally {
+          setAvatarBusy(false);
+        }
+      },
+    });
+  };
 
   const copyAddress = async () => {
     try {
@@ -1273,6 +1380,44 @@ export default function ServerHome(props: Props) {
         className="files-sheet"
       >
         <div className="files-body">
+          <div className="files-sub">个人资料</div>
+          <div className="sh-avatar-row">
+            <Avatar
+              id={state.ownId}
+              name={ownMember?.nickname || state.nickname || account.username || '我'}
+              ownId={state.ownId}
+              avatarToken={avatarToken}
+              accountAvatar={account.avatarUrl}
+              size={64}
+            />
+            <div className="sh-avatar-info">
+              <div className="sh-set-label">
+                {account.phase === 'signedIn' ? account.username || state.nickname : state.nickname || '游客'}
+              </div>
+              <div className="sh-set-desc">
+                {account.phase === 'signedIn'
+                  ? account.email || '设置一张头像，服务器与其他客户端都能看到。'
+                  : '游客身份没有账号头像，登录 myTeamSpeak 后即可上传。'}
+              </div>
+              {account.phase === 'signedIn' && (
+                <div className="sh-avatar-actions">
+                  <input ref={avatarFileRef} type="file" accept="image/*" hidden onChange={onAvatarFile} />
+                  <Button size="small" disabled={avatarBusy} onClick={pickAvatar}>
+                    {account.avatarUrl ? '更换头像' : '上传头像'}
+                  </Button>
+                  {account.avatarUrl && (
+                    <Button size="small" type="danger" disabled={avatarBusy} onClick={confirmRemoveAvatar}>
+                      删除头像
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          {account.phase !== 'signedIn' && (
+            <div className="sh-set-hint">提示：头像属于 myTeamSpeak 账号，先在连接页登录后再来设置。</div>
+          )}
+
           <div className="files-sub">通知</div>
           <div className="sh-set-row">
             <div className="sh-set-row-text">
@@ -1468,6 +1613,9 @@ export default function ServerHome(props: Props) {
                     renderDialogueContent: ({ message, defaultContent }) => {
                       const line = message ? aiLineById.get(String(message.id)) : undefined;
                       if (!line) return defaultContent;
+                      // 带附件标记的消息交给专门的组件渲染（图片给预览，文件给卡片）。
+                      const { att } = parseAttachment(line.text);
+                      if (att) return <ChatAttachment att={att} token={fileToken} />;
                       const text = convertShortcodes(line.text);
                       // 纯表情消息（1~3 个 emoji）按大号渲染，其余沿用默认（Markdown）渲染。
                       if (isEmojiOnly(text)) {
@@ -1536,7 +1684,8 @@ export default function ServerHome(props: Props) {
                 htmlType="button"
                 title="附件"
                 aria-label="附件"
-                onClick={() => Toast.info('该功能正在开发中')}
+                disabled={!connected || attachBusy}
+                onClick={() => pickAttachment('file')}
               >
                 <IcClip />
               </Button>
@@ -1545,12 +1694,26 @@ export default function ServerHome(props: Props) {
                 htmlType="button"
                 title="图片"
                 aria-label="图片"
-                onClick={() => Toast.info('该功能正在开发中')}
+                disabled={!connected || attachBusy}
+                onClick={() => pickAttachment('image')}
               >
                 <IcImage />
               </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                style={{ display: 'none' }}
+                onChange={(e) => onAttachmentPicked(e, 'file')}
+              />
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => onAttachmentPicked(e, 'image')}
+              />
               <span className="sh-composer-spacer" />
-              <span className="sh-composer-hint">Enter 发送</span>
+              <span className="sh-composer-hint">{attachBusy ? '上传中…' : 'Enter 发送'}</span>
               <Button className="sh-send-btn btn-semi" htmlType="button" onClick={send} disabled={!connected || !draft.trim()}>
                 发送
               </Button>
