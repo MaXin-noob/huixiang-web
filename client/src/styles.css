@@ -4610,8 +4610,7 @@ button.files-name:hover {
 .uc-vol .semi-slider-handle {
   width: 14px;
   height: 14px;
-  margin-top: 0;
-  margin-left: -7px;
+  margin-top: 9px;
   background: #00b42a;
   border: 2px solid #ffffff;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
@@ -4619,51 +4618,15 @@ button.files-name:hover {
 .uc-vol .semi-slider-handle:hover {
   background: #00b42a;
 }
-.uc-vol-range.semi-slider-wrapper {
+/* Semi 的滑块是 div 结构：根部必须撑住内部 32px 的轨道，否则行高只按
+   旧的原生 input 高度（4px）计算，滑块就会越出卡片底部。 */
+.uc-vol dd > .semi-slider {
+  height: 24px;
+  padding: 0;
+}
+.uc-vol dd > .semi-slider .semi-slider-wrapper {
   width: 100%;
-  height: auto;
-  background: transparent;
-  border-radius: 0;
-}
-.uc-vol-range {
-  flex: 1;
-  min-width: 0;
-  height: 4px;
-  appearance: none;
-  -webkit-appearance: none;
-  border-radius: 2px;
-  background: #e5f6e9;
-  outline: none;
-  cursor: pointer;
-}
-.uc-vol-range::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 2px;
-  background: #e5f6e9;
-}
-.uc-vol-range::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -5px;
-  border-radius: 50%;
-  background: #00b42a;
-  border: 2px solid #ffffff;
-  box-sizing: border-box;
-}
-.uc-vol-range::-moz-range-track {
-  height: 4px;
-  border-radius: 2px;
-  background: #e5f6e9;
-}
-.uc-vol-range::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #00b42a;
-  border: 2px solid #ffffff;
-  box-sizing: border-box;
+  height: 24px;
 }
 .uc-vol-pct {
   flex: 0 0 auto;

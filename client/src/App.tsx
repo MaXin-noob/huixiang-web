@@ -829,12 +829,6 @@ export default function App() {
     gatewayRef.current?.listFiles(cid, path);
   }, []);
 
-  const rename = useCallback((name: string) => {
-    if (!name.trim()) return;
-    gatewayRef.current?.rename(name.trim());
-    store.setNickname(name.trim());
-  }, []);
-
   /** 麦克风音量：改采集增益，开麦后立刻生效，并记住下次。 */
   const changeMicGain = useCallback((v: number) => {
     const g = clampGain(v);
@@ -942,10 +936,6 @@ export default function App() {
 
   const shareScreen = useCallback(() => {
     void streamRef.current?.startScreen();
-  }, []);
-
-  const shareCamera = useCallback(() => {
-    void streamRef.current?.startCamera();
   }, []);
 
   const stopShare = useCallback(() => streamRef.current?.stopShare(), []);
@@ -1057,7 +1047,6 @@ export default function App() {
         onSay={say}
         onPrivately={sayTo}
         onListFiles={listFiles}
-        onRename={rename}
         onMicGain={changeMicGain}
         onOutputGain={changeOutputGain}
         onMemberVolume={changeMemberVolume}
@@ -1066,7 +1055,6 @@ export default function App() {
         onDisconnect={disconnect}
         onReconnect={reconnectSame}
         onShareScreen={shareScreen}
-        onShareCamera={shareCamera}
         onStopShare={stopShare}
         onWatch={watchStream}
         onStopWatch={stopWatch}
@@ -1122,7 +1110,6 @@ export default function App() {
     say,
     sayTo,
     listFiles,
-    rename,
     changeMicGain,
     changeOutputGain,
     changeMemberVolume,
@@ -1131,7 +1118,6 @@ export default function App() {
     disconnect,
     reconnectSame,
     shareScreen,
-    shareCamera,
     stopShare,
     watchStream,
     stopWatch,

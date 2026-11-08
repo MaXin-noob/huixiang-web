@@ -31,6 +31,7 @@ import {
   IconUserGroup,
   IconFolder,
   IconChevronDown,
+  IconChevronUp,
   IconChevronLeft,
   IconChevronRight,
   IconLock,
@@ -164,8 +165,6 @@ interface Props {
   stream?: StreamState;
   /** 开始共享屏幕。 */
   onShareScreen?: () => void;
-  /** 开始共享摄像头。 */
-  onShareCamera?: () => void;
   /** 停止自己的共享。 */
   onStopShare?: () => void;
   /** 观看某个成员的直播。 */
@@ -178,6 +177,12 @@ interface Props {
   onEditChannel?: (cid: number, patch: ChannelPatch) => void;
   /** 删除频道（连同子频道，成员移到默认频道）。 */
   onDeleteChannel?: (cid: number) => void;
+  /** 把成员踢出当前频道（回到默认频道）。 */
+  onKickMember?: (member: Member, reason: string) => void;
+  /** 把成员从服务器上踢出。 */
+  onKickFromChannel?: (member: Member, reason: string) => void;
+  /** 封禁成员；seconds 为 0 表示永久。 */
+  onBanMember?: (member: Member, seconds: number, reason: string) => void;
   /**
    * 本期只接入 M1/M2 用到的字段；旧 ServerPage 传进来的其余字段（文件、串流、
    * 好友、云聊天、频道管理等）先照单接收，等后续里程碑逐个接上，避免一次性大改。
@@ -421,6 +426,9 @@ export default function ServerHome(props: Props) {
     onCreateChannel,
     onEditChannel,
     onDeleteChannel,
+    onKickMember,
+    onKickFromChannel,
+    onBanMember,
   } = props;
 
   const connected = state.phase === 'connected';
@@ -439,6 +447,10 @@ export default function ServerHome(props: Props) {
   const [chanDialog, setChanDialog] = useState<{ mode: 'create' | 'edit'; target: ChannelNode | null } | null>(null);
   const [chanForm, setChanForm] = useState<ChanForm>(() => defaultChanForm());
   const [deleteTarget, setDeleteTarget] = useState<ChannelNode | null>(null);
+  // 成员管理：踢出频道 / 踢出服务器 / 封禁（弹窗里填原因、选封禁时长）。
+  const [modTarget, setModTarget] = useState<{ member: Member; kind: 'channel' | 'server' | 'ban' } | null>(null);
+  const [modReason, setModReason] = useState('');
+  const [banSeconds, setBanSeconds] = useState(600);
   const [filesOpen, setFilesOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [draft, setDraft] = useState('');
@@ -486,6 +498,17 @@ export default function ServerHome(props: Props) {
 
   // 一次性摊平整棵树：既保留父→子顺序，又方便过滤。
   const flat = useMemo(() => flatten(state.tree), [state.tree]);
+
+  // 同一父频道下的频道（按显示顺序）；频道排序的上移/下移据此判断相邻项。
+  const siblingChannels = useMemo(() => {
+    const m = new Map<number, ChannelNode[]>();
+    for (const { channel } of flat) {
+      const arr = m.get(channel.parent);
+      if (arr) arr.push(channel);
+      else m.set(channel.parent, [channel]);
+    }
+    return m;
+  }, [flat]);
 
   // 好友是否正连在这台服务器上：uid → clientId；昵称兜底（好友的 identifier 就是 TS 身份 UID）
   const onlineUids = useMemo(() => {
@@ -675,6 +698,32 @@ export default function ServerHome(props: Props) {
     setDeleteTarget(null);
   };
 
+  // 频道排序：与相邻的同级频道交换 channel_order（服务器按 order 升序排列）。
+  const moveChannel = (channel: ChannelNode, dir: -1 | 1) => {
+    const sibs = siblingChannels.get(channel.parent) ?? [];
+    const i = sibs.findIndex((c) => c.id === channel.id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= sibs.length) return;
+    const other = sibs[j];
+    onEditChannel?.(channel.id, { after: other.order ?? j });
+    onEditChannel?.(other.id, { after: channel.order ?? i });
+  };
+
+  // 成员管理：打开弹窗（踢出频道 / 踢出服务器 / 封禁），提交时带上原因与时长。
+  const openMod = (member: Member, kind: 'channel' | 'server' | 'ban') => {
+    setModReason('');
+    setBanSeconds(600);
+    setModTarget({ member, kind });
+  };
+  const submitMod = () => {
+    if (!modTarget) return;
+    const reason = modReason.trim();
+    if (modTarget.kind === 'channel') onKickFromChannel?.(modTarget.member, reason);
+    else if (modTarget.kind === 'server') onKickMember?.(modTarget.member, reason);
+    else onBanMember?.(modTarget.member, banSeconds, reason);
+    setModTarget(null);
+  };
+
   const send = () => {
     // 先把 `:blush:` 这类短码转成 emoji，再发送；纯空白不发送。
     const text = convertShortcodes(draft).trim();
@@ -838,6 +887,10 @@ export default function ServerHome(props: Props) {
             const members = q
               ? channel.clients.filter((m) => m.nickname.toLowerCase().includes(q))
               : channel.clients;
+            const sibs = siblingChannels.get(channel.parent) ?? [];
+            const chanPos = sibs.findIndex((c) => c.id === channel.id);
+            const canMoveUp = chanPos > 0;
+            const canMoveDown = chanPos >= 0 && chanPos < sibs.length - 1;
             return (
               <div key={channel.id}>
                 <Button
@@ -891,6 +944,12 @@ export default function ServerHome(props: Props) {
                         </Dropdown.Item>
                         <Dropdown.Item icon={<IconEdit />} onClick={() => openEditChannel(channel)}>
                           <span className="sh-dd-label">编辑频道</span>
+                        </Dropdown.Item>
+                        <Dropdown.Item icon={<IconChevronUp />} disabled={!canMoveUp} onClick={() => moveChannel(channel, -1)}>
+                          <span className="sh-dd-label">上移</span>
+                        </Dropdown.Item>
+                        <Dropdown.Item icon={<IconChevronDown />} disabled={!canMoveDown} onClick={() => moveChannel(channel, 1)}>
+                          <span className="sh-dd-label">下移</span>
                         </Dropdown.Item>
                         <Dropdown.Divider />
                         <Dropdown.Item
@@ -984,6 +1043,32 @@ export default function ServerHome(props: Props) {
                         ) : null}
                         {m.away ? <span className="sh-member-away">离开</span> : null}
                         {speaking ? <span className="sh-member-dot" /> : null}
+                        {m.id !== state.ownId && (
+                          <Dropdown
+                            trigger="click"
+                            position="bottomRight"
+                            spacing={4}
+                            stopPropagation
+                            render={
+                              <Dropdown.Menu className="sh-chan-dd">
+                                <Dropdown.Item onClick={() => openMod(m, 'channel')}>
+                                  <span className="sh-dd-label">踢出频道</span>
+                                </Dropdown.Item>
+                                <Dropdown.Item onClick={() => openMod(m, 'server')}>
+                                  <span className="sh-dd-label">踢出服务器</span>
+                                </Dropdown.Item>
+                                <Dropdown.Divider />
+                                <Dropdown.Item type="danger" onClick={() => openMod(m, 'ban')}>
+                                  <span className="sh-dd-label">封禁…</span>
+                                </Dropdown.Item>
+                              </Dropdown.Menu>
+                            }
+                          >
+                            <span className="sh-member-more" title="成员管理" onClick={(e) => e.stopPropagation()}>
+                              <IconMore size="small" />
+                            </span>
+                          </Dropdown>
+                        )}
                       </div>
                     </Popover>
                     );
@@ -1284,7 +1369,7 @@ export default function ServerHome(props: Props) {
               <Button
                 className={`sh-icon-btn${stream.sharing !== null ? ' is-live' : ''} btn-semi`}
                 htmlType="button"
-                title={stream.sharing !== null ? '直播中，点击管理' : '开始直播（屏幕 / 摄像头）'}
+                title={stream.sharing !== null ? '直播中，点击管理' : '开始直播（共享屏幕）'}
                 aria-pressed={stream.sharing !== null}
               >
                 <IcMonitor />
@@ -1692,6 +1777,76 @@ export default function ServerHome(props: Props) {
                 加入
               </Button>
             </div>
+        </Modal>
+      )}
+
+      {modTarget && (
+        <Modal
+          visible
+          onCancel={() => setModTarget(null)}
+          footer={null}
+          header={null}
+          closable={false}
+          modalContentClass="sh-modal"
+          width={400}
+          centered
+        >
+          <div className="sh-modal-title">
+            {modTarget.kind === 'channel'
+              ? `把「${modTarget.member.nickname}」踢出频道`
+              : modTarget.kind === 'server'
+                ? `把「${modTarget.member.nickname}」踢出服务器`
+                : `封禁「${modTarget.member.nickname}」`}
+          </div>
+          <div className="sh-modal-desc">
+            {modTarget.kind === 'channel'
+              ? '该成员会回到默认频道，仍留在服务器上。'
+              : modTarget.kind === 'server'
+                ? '该成员会被断开连接，但之后还能重新加入。'
+                : '封禁后该成员将无法再进入，直到封禁到期；时长选「永久」则一直有效。'}
+          </div>
+          <div className="sh-form">
+            <label className="sh-form-row">
+              <span className="sh-form-label">原因</span>
+              <TextArea
+                className="sh-form-input sh-form-textarea"
+                value={modReason}
+                maxLength={200}
+                rows={3}
+                borderless
+                onChange={(value) => setModReason(value)}
+                placeholder="可选，会告知对方"
+              />
+            </label>
+            {modTarget.kind === 'ban' && (
+              <div className="sh-form-row">
+                <span className="sh-form-label">时长</span>
+                <Select
+                  className="sh-form-select"
+                  value={banSeconds}
+                  onChange={(value) => setBanSeconds(Number(value))}
+                >
+                  <Select.Option value={60}>1 分钟</Select.Option>
+                  <Select.Option value={600}>10 分钟</Select.Option>
+                  <Select.Option value={3600}>1 小时</Select.Option>
+                  <Select.Option value={86400}>1 天</Select.Option>
+                  <Select.Option value={0}>永久</Select.Option>
+                </Select>
+              </div>
+            )}
+          </div>
+          <div className="sh-modal-actions">
+            <Button className="sh-btn-ghost btn-semi" htmlType="button" onClick={() => setModTarget(null)}>
+              取消
+            </Button>
+            <Button
+              className={`${modTarget.kind === 'ban' ? 'sh-btn-danger' : 'sh-btn-primary'} btn-semi`}
+              htmlType="button"
+              onClick={submitMod}
+            >
+              确定
+            </Button>
+          </div>
         </Modal>
       )}
 

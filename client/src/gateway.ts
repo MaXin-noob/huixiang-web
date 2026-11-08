@@ -302,10 +302,6 @@ export class Gateway {
     this.send({ t: 'history', channel, before, limit });
   }
 
-  rename(name: string) {
-    this.send({ t: 'rename', name });
-  }
-
   /** 要某人的资料卡补充字段（服务器公开的那部分）；答案从 `onPerson` 回来。 */
   requestPerson(clid: number) {
     this.send({ t: 'person', clid });

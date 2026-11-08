@@ -413,6 +413,37 @@
   background: var(--sh-speaking);
 }
 
+/* 成员行右侧的「更多」入口（踢出频道 / 踢出服务器 / 封禁），平时淡出，悬停成员行才出现 */
+.sh-member-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  border-radius: 6px;
+  color: var(--sh-text-3);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.sh-member:hover .sh-member-more {
+  opacity: 1;
+}
+
+.sh-member-more:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--sh-text-1);
+}
+
+@media (hover: none) {
+  .sh-member-more {
+    opacity: 1;
+  }
+}
+
 .sh-spacer {
   flex: 1;
   min-height: 8px;
