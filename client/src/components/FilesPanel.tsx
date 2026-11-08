@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { Input, Modal, SideSheet, Toast } from '@douyinfe/semi-ui';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Input, Modal, SideSheet, Toast, Upload } from '@douyinfe/semi-ui';
 import {
   IconChevronRight,
   IconDelete,
@@ -75,7 +75,6 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
   const [dialogText, setDialogText] = useState('');
   const [busy, setBusy] = useState(false);
   const timers = useRef<number[]>([]);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   // 打开面板、换目录、换频道都要重新问一次；关着的时候不问
   useEffect(() => {
@@ -193,15 +192,6 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
     [token, cid, path, update, fadeLater, refresh],
   );
 
-  const onPickFiles = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files ?? []);
-      e.target.value = '';
-      for (const f of files) doUpload(f, false);
-    },
-    [doUpload],
-  );
-
   const openMkdir = useCallback(() => {
     setDialogText('');
     setDialog({ kind: 'mkdir' });
@@ -288,54 +278,62 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
       <div className="files-body">
         <div className="files-sub">{channelName} · 服务器上这个频道的文件，可上传、下载、改名</div>
 
-        <input ref={fileInput} type="file" multiple style={{ display: 'none' }} onChange={onPickFiles} />
-
         <div className="files-bar">
           <div className="files-crumbs">
             {crumbs.map((c, i) => (
               <span key={c.path} className="files-crumb-wrap">
                 {i > 0 && <IconChevronRight size="small" className="files-crumb-sep" />}
-                <button
-                  type="button"
-                  className={`files-crumb${i === crumbs.length - 1 ? ' is-here' : ''}`}
+                <Button
+                  htmlType="button"
+                  className={`files-crumb${i === crumbs.length - 1 ? ' is-here' : ''} btn-semi`}
                   onClick={() => setPath(c.path)}
                   disabled={i === crumbs.length - 1}
                 >
                   {c.name}
-                </button>
+                </Button>
               </span>
             ))}
           </div>
           <div className="files-tools">
-            <button
-              type="button"
-              className="icon-btn"
-              title="上传文件"
-              aria-label="上传文件"
+            <Upload
+              className="files-upload"
+              multiple
+              showUploadList={false}
+              uploadTrigger="custom"
               disabled={!token}
-              onClick={() => fileInput.current?.click()}
+              onFileChange={(files) => {
+                for (const f of files) doUpload(f, false);
+              }}
             >
-              <IconUpload size="small" />
-            </button>
-            <button
-              type="button"
-              className="icon-btn"
+              <Button
+                htmlType="button"
+                className="icon-btn btn-semi"
+                title="上传文件"
+                aria-label="上传文件"
+                disabled={!token}
+              >
+                <IconUpload size="small" />
+              </Button>
+            </Upload>
+            <Button
+              htmlType="button"
+              className="icon-btn btn-semi"
               title="新建文件夹"
               aria-label="新建文件夹"
               disabled={!token}
               onClick={openMkdir}
             >
               <IconPlus size="small" />
-            </button>
-            <button
-              type="button"
-              className="icon-btn"
+            </Button>
+            <Button
+              htmlType="button"
+              className="icon-btn btn-semi"
               title="刷新"
               aria-label="刷新"
               onClick={() => onList(cid, path)}
             >
               <IconRefresh size="small" />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -383,9 +381,9 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
                 </span>
                 <div className="files-main">
                   {entry.folder ? (
-                    <button type="button" className="files-name is-folder" onClick={() => setPath(joinPath(path, entry.name))}>
+                    <Button htmlType="button" className="files-name is-folder btn-semi" onClick={() => setPath(joinPath(path, entry.name))}>
                       {entry.name}
-                    </button>
+                    </Button>
                   ) : (
                     <span className="files-name" title={entry.name}>
                       {entry.name}
@@ -398,36 +396,36 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
                 </div>
                 <div className="files-actions">
                   {!entry.folder && (
-                    <button
-                      type="button"
-                      className="files-act"
+                    <Button
+                      htmlType="button"
+                      className="files-act btn-semi"
                       title="下载"
                       aria-label={`下载 ${entry.name}`}
                       onClick={() => startDownload(entry)}
                     >
                       <IconDownload size="small" />
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    type="button"
-                    className="files-act"
+                  <Button
+                    htmlType="button"
+                    className="files-act btn-semi"
                     title="重命名"
                     aria-label={`重命名 ${entry.name}`}
                     disabled={!token}
                     onClick={() => openRename(entry)}
                   >
                     <IconEdit size="small" />
-                  </button>
-                  <button
-                    type="button"
-                    className="files-act is-danger"
+                  </Button>
+                  <Button
+                    htmlType="button"
+                    className="files-act is-danger btn-semi"
                     title="删除"
                     aria-label={`删除 ${entry.name}`}
                     disabled={!token}
                     onClick={() => openDelete(entry)}
                   >
                     <IconDelete size="small" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}

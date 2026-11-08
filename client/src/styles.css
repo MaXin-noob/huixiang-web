@@ -2,6 +2,35 @@
    所有颜色、字号、间距先走 token，再喂给 Semi 的同名 CSS 变量，
    这样 Semi 组件和自有组件用的是同一套值，暗色只需换 :root 里的值。 */
 
+/* 原生按钮已改用 Semi Button 承载。这里清掉 Semi 的默认外观，
+   把尺寸 / 颜色 / 背景 / 边框交还给各组件原来的自定义类（它们在本文件后面或组件 CSS 里）。 */
+.btn-semi {
+  height: auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+.btn-semi:hover,
+.btn-semi:active {
+  background: transparent;
+  border: none;
+  color: inherit;
+}
+/* Semi 会把子节点包进 .semi-button-content，破坏原有 flex 子项的 gap / flex:1 布局；
+   设为 contents 让子节点重新直接参与父级 flex 布局，恢复改造前的对齐。 */
+.btn-semi .semi-button-content {
+  display: contents;
+}
+
 :root {
   /* 品牌 */
   --brand: #6c4bf6;
@@ -231,6 +260,87 @@ body {
   color: var(--text-1);
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(21, 23, 28, 0.08);
+}
+
+
+/* Semi Tabs 承载登录页签：轨道外层保持胶囊，内部 bar 横排、两页签等宽 */
+.login-tabs.semi-tabs {
+  display: block;
+  padding: 3px;
+  border: none;
+  background: var(--login-track);
+  border-radius: 23px;
+}
+.login-tabs .semi-tabs-content {
+  display: none;
+}
+.login-tabs .semi-tabs-bar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: none;
+  background: transparent;
+}
+.login-tabs .semi-tabs-bar-button {
+  border: none;
+  background: transparent;
+}
+.login-tabs .semi-tabs-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 40px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.login-tabs .semi-tabs-tab + .semi-tabs-tab {
+  margin-left: 0;
+}
+.login-tabs .semi-tabs-tab:hover {
+  color: var(--text-2);
+}
+.login-tabs .semi-tabs-tab.semi-tabs-tab-button {
+  border-radius: 20px;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.login-tabs .semi-tabs-tab.semi-tabs-tab-active {
+  background: var(--bg-panel);
+  color: var(--text-1);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(21, 23, 28, 0.08);
+}
+
+/* Semi 弹层通过 portal 挂到 body，不在 .sh-shell 内，补齐主界面 token */
+.semi-modal-content,
+.semi-sidesheet {
+  --sh-brand: #00b42a;
+  --sh-brand-deep: #007a1d;
+  --sh-brand-soft: #e9f7ec;
+  --sh-line: #edeaf5;
+  --sh-line-soft: #f1eff7;
+  --sh-field: #f5f6f7;
+  --sh-text-1: #15171c;
+  --sh-text-2: #4c515b;
+  --sh-text-3: #7a808c;
+  --sh-text-4: #a8adb8;
 }
 
 .login-title {
@@ -497,6 +607,51 @@ body {
 .login-agree b {
   font-weight: 500;
   color: var(--login-accent-ink);
+}
+
+/* Semi Checkbox：登录页「记住密码 / 协议」 */
+.login-remember.semi-checkbox,
+.login-agree.semi-checkbox {
+  align-items: center;
+}
+
+.login-remember.semi-checkbox .semi-checkbox-inner,
+.login-agree.semi-checkbox .semi-checkbox-inner,
+.login-remember.semi-checkbox .semi-checkbox-inner-display,
+.login-agree.semi-checkbox .semi-checkbox-inner-display {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-remember.semi-checkbox .semi-checkbox-inner-display .semi-icon,
+.login-agree.semi-checkbox .semi-checkbox-inner-display .semi-icon {
+  width: 10px;
+  height: 10px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.login-remember.semi-checkbox .semi-checkbox-addon,
+.login-agree.semi-checkbox .semi-checkbox-addon {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: inherit;
+}
+
+.login-remember.semi-checkbox .semi-checkbox-inner-display,
+.login-agree.semi-checkbox .semi-checkbox-inner-display {
+  border-radius: 4px;
+}
+
+.login-remember.semi-checkbox.semi-checkbox-checked .semi-checkbox-inner-display,
+.login-agree.semi-checkbox.semi-checkbox-checked .semi-checkbox-inner-display {
+  border-color: var(--login-accent);
+  background-color: var(--login-accent);
+  box-shadow: none;
 }
 
 /* 其他登录方式：暂时只有样式，后端还没接，点不动 */
@@ -3130,6 +3285,47 @@ button.files-name:hover {
   border-radius: inherit;
 }
 
+/* Semi Avatar 内部结构与旧自绘头像不同：图片/首字母在 .semi-avatar-content 内 */
+.msg-avatar.semi-avatar,
+.avatar.semi-avatar,
+.account-avatar.semi-avatar,
+.friend-avatar.semi-avatar,
+.user-card-avatar.semi-avatar {
+  overflow: hidden;
+}
+.msg-avatar .semi-avatar-content,
+.avatar .semi-avatar-content,
+.account-avatar .semi-avatar-content,
+.friend-avatar .semi-avatar-content,
+.user-card-avatar .semi-avatar-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  overflow: hidden;
+}
+.msg-avatar .semi-avatar-content > img,
+.avatar .semi-avatar-content > img,
+.account-avatar .semi-avatar-content > img,
+.friend-avatar .semi-avatar-content > img,
+.user-card-avatar .semi-avatar-content > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.msg-avatar .semi-avatar-label,
+.avatar .semi-avatar-label,
+.account-avatar .semi-avatar-label,
+.friend-avatar .semi-avatar-label,
+.user-card-avatar .semi-avatar-label {
+  font: inherit;
+  line-height: 1;
+  color: inherit;
+}
+
 .account-avatar,
 .friend-avatar {
   display: flex;
@@ -3241,7 +3437,7 @@ button.files-name:hover {
 .saved-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   max-height: 190px;
   overflow-y: auto;
 }
@@ -3249,9 +3445,10 @@ button.files-name:hover {
 .saved-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 8px 10px;
+  height: auto;
+  padding: 12px 14px;
   border: none;
   border-radius: 10px;
   background: var(--bg-fill);
@@ -3270,12 +3467,14 @@ button.files-name:hover {
 .saved-main {
   display: flex;
   flex-direction: column;
+  gap: 4px;
   min-width: 0;
   flex: 1;
 }
 
 .saved-name {
-  font-size: 12.5px;
+  font-size: 13px;
+  line-height: 1.4;
   font-weight: 500;
   color: var(--text-1);
   overflow: hidden;
@@ -3284,7 +3483,8 @@ button.files-name:hover {
 }
 
 .saved-sub {
-  font-size: 11px;
+  font-size: 11.5px;
+  line-height: 1.4;
   color: var(--text-4);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3820,6 +4020,37 @@ button.files-name:hover {
   line-height: 1.35;
   box-shadow: 0 6px 20px rgba(21, 23, 28, 0.22);
   animation: presence-in 0.18s ease-out;
+}
+
+.presence-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Semi Notification 承载进离场提示：保持原有深色小提示条外观 */
+.presence-notification.semi-notification {
+  width: auto;
+  max-width: 340px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(21, 23, 28, 0.92);
+  box-shadow: 0 6px 20px rgba(21, 23, 28, 0.22);
+}
+.presence-notification .semi-notification-inner {
+  padding: 0;
+}
+.presence-notification .semi-notification-content,
+.presence-notification .semi-notification-title {
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.presence-notification .semi-notification-content-wrapper {
+  padding: 0;
+}
+.presence-notification .semi-notification-icon {
+  display: none;
 }
 
 .presence-dot {
@@ -4370,6 +4601,29 @@ button.files-name:hover {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.uc-vol dd > .semi-slider {
+  flex: 1;
+  min-width: 0;
+  --semi-color-primary: #00b42a;
+}
+.uc-vol .semi-slider-handle {
+  width: 14px;
+  height: 14px;
+  margin-top: 0;
+  margin-left: -7px;
+  background: #00b42a;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.uc-vol .semi-slider-handle:hover {
+  background: #00b42a;
+}
+.uc-vol-range.semi-slider-wrapper {
+  width: 100%;
+  height: auto;
+  background: transparent;
+  border-radius: 0;
 }
 .uc-vol-range {
   flex: 1;

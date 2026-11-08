@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import '../node_modules/@douyinfe/semi-ui/dist/css/semi.min.css';
 import './styles.css';
 import App from './App';
+import './button-semi-overrides.css';
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

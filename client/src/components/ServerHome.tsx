@@ -1,5 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Avatar as SemiAvatar, AIChatDialogue, Dropdown, Popover, SideSheet, Switch, Toast } from '@douyinfe/semi-ui';
+import {
+  Button,
+  Avatar as SemiAvatar,
+  AIChatDialogue,
+  Checkbox,
+  Dropdown,
+  Input,
+  InputNumber,
+  Modal,
+  Popover,
+  Radio,
+  RadioGroup,
+  Select,
+  SideSheet,
+  Slider,
+  Switch,
+  TextArea,
+  Toast,
+} from '@douyinfe/semi-ui';
 import {
   IconMore,
   IconEdit,
@@ -667,7 +685,9 @@ export default function ServerHome(props: Props) {
   };
 
   const info = state.server ?? null;
-  const online = info?.clientsOnline ?? state.clientCount;
+  // virtualserver_clientsonline 会把 serverquery 查询客户端也算进去；
+  // 页面上只统计真实用户客户端（client_type=0），避免“只有 1 人却显示 2”。
+  const online = state.clientCount > 0 ? state.clientCount : (info?.clientsOnline ?? 0);
   const maxClients = info?.maxClients ?? null;
   const uptimeSec =
     info?.uptime != null && info?.receivedAt != null
@@ -705,17 +725,17 @@ export default function ServerHome(props: Props) {
                 {state.address}
               </div>
             </div>
-            <button className="sh-more-btn" type="button" title="更多" onClick={() => setMoreOpen((v) => !v)}>
+            <Button className="sh-more-btn btn-semi" htmlType="button" title="更多" onClick={() => setMoreOpen((v) => !v)}>
               <IconMore />
-            </button>
+            </Button>
           </div>
 
           <div className="sh-server-status">
             {searchOpen ? (
-              <input
+              <Input
                 className="sh-search sh-search-inline"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(value) => setQuery(value)}
                 onBlur={() => {
                   setSearchOpen(false);
                   setQuery('');
@@ -754,9 +774,9 @@ export default function ServerHome(props: Props) {
                 </Popover>
               </div>
             )}
-            <button
-              className="sh-status-search"
-              type="button"
+            <Button
+              className="sh-status-search btn-semi"
+              htmlType="button"
               title={searchOpen ? '关闭搜索' : '搜索频道或成员'}
               onClick={() => {
                 if (searchOpen) {
@@ -768,7 +788,7 @@ export default function ServerHome(props: Props) {
               }}
             >
               {searchOpen ? <IconClose size="small" /> : <IcSearch />}
-            </button>
+            </Button>
           </div>
 
           {banner ? (
@@ -783,14 +803,14 @@ export default function ServerHome(props: Props) {
         <div className="sh-rail-body">
           <div className="sh-section">
             <span>语音频道</span>
-            <button
-              className="sh-sec-plus"
-              type="button"
+            <Button
+              className="sh-sec-plus btn-semi"
+              htmlType="button"
               title="新建频道"
               onClick={() => openCreateChannel()}
             >
               <IconPlus size="small" />
-            </button>
+            </Button>
           </div>
 
           {visible.length === 0 && <div className="sh-empty">没有匹配的频道</div>}
@@ -811,9 +831,9 @@ export default function ServerHome(props: Props) {
               : channel.clients;
             return (
               <div key={channel.id}>
-                <button
-                  className={`sh-chan${selected ? ' selected' : ''}`}
-                  type="button"
+                <Button
+                  className={`sh-chan${selected ? ' selected' : ''} btn-semi`}
+                  htmlType="button"
                   title={selected ? '当前所在频道' : '双击进入频道'}
                   onDoubleClick={() => tryJoin(channel)}
                 >
@@ -888,7 +908,7 @@ export default function ServerHome(props: Props) {
                       <IconMore size="small" />
                     </span>
                   </Dropdown>
-                </button>
+                </Button>
 
                 {hasClients &&
                   !isCollapsed &&
@@ -937,9 +957,9 @@ export default function ServerHome(props: Props) {
                           {m.nickname}
                         </span>
                         {m.streaming ? (
-                          <button
-                            type="button"
-                            className="sh-member-live"
+                          <Button
+                            htmlType="button"
+                            className="sh-member-live btn-semi"
                             onClick={(e) => {
                               e.stopPropagation();
                               onWatch?.(m.id);
@@ -948,7 +968,7 @@ export default function ServerHome(props: Props) {
                           >
                             <span className="sh-live-dot" />
                             直播中
-                          </button>
+                          </Button>
                         ) : null}
                         {m.away ? <span className="sh-member-away">离开</span> : null}
                         {speaking ? <span className="sh-member-dot" /> : null}
@@ -989,9 +1009,9 @@ export default function ServerHome(props: Props) {
           </div>
           <div className="sh-me-actions">
             {micMode === 'ptt' && (
-              <button
-                className={`sh-me-btn${pttHeld ? ' on' : ''}`}
-                type="button"
+              <Button
+                className={`sh-me-btn${pttHeld ? ' on' : ''} btn-semi`}
+                htmlType="button"
                 title="按住说话（也可按住空格键）"
                 aria-label="按住说话"
                 aria-pressed={pttHeld}
@@ -1005,16 +1025,16 @@ export default function ServerHome(props: Props) {
                 onPointerLeave={() => onPttHold?.(false)}
               >
                 <IconMicrophone size="small" />
-              </button>
+              </Button>
             )}
             <VolumePopover
               title="麦克风音量"
               value={micGain}
               onChange={(v) => onMicGain?.(v)}
             >
-              <button
-                className={`sh-me-btn${micOn && micGain > 0 ? ' on' : ''}`}
-                type="button"
+              <Button
+                className={`sh-me-btn${micOn && micGain > 0 ? ' on' : ''} btn-semi`}
+                htmlType="button"
                 title="麦克风音量（拖到 0 即静音）"
                 aria-label={`麦克风音量 ${gainPercent(micGain)}%`}
                 onClick={() => {
@@ -1022,7 +1042,7 @@ export default function ServerHome(props: Props) {
                 }}
               >
                 {micOn && micGain > 0 ? <IconMicrophone size="small" /> : <IconMicrophoneOff size="small" />}
-              </button>
+              </Button>
             </VolumePopover>
             <VolumePopover
               title="扬声器音量"
@@ -1030,9 +1050,9 @@ export default function ServerHome(props: Props) {
               onChange={(v) => onOutputGain?.(v)}
               zeroHint="为 0 时你听不到声音"
             >
-              <button
-                className={`sh-me-btn${state.outputMuted || outputGain === 0 ? '' : ' on'}`}
-                type="button"
+              <Button
+                className={`sh-me-btn${state.outputMuted || outputGain === 0 ? '' : ' on'} btn-semi`}
+                htmlType="button"
                 title={`扬声器音量 ${gainPercent(outputGain)}%`}
                 aria-label={`扬声器音量 ${gainPercent(outputGain)}%`}
               >
@@ -1041,7 +1061,7 @@ export default function ServerHome(props: Props) {
                 ) : (
                   <IconVolume2 size="small" />
                 )}
-              </button>
+              </Button>
             </VolumePopover>
             <AwayPopover
               away={away}
@@ -1049,14 +1069,14 @@ export default function ServerHome(props: Props) {
               onToggleAway={(v) => onToggleAway?.(v)}
               onSetAwayMessage={(m) => onSetAwayMessage?.(m)}
             >
-              <button
-                className={`sh-me-btn${away ? ' on' : ''}`}
-                type="button"
+              <Button
+                className={`sh-me-btn${away ? ' on' : ''} btn-semi`}
+                htmlType="button"
                 title={away ? '离开中，点此修改暂离设置' : '设置暂离状态'}
                 aria-pressed={away}
               >
                 <IconMoon size="small" />
-              </button>
+              </Button>
             </AwayPopover>
           </div>
         </footer>
@@ -1067,9 +1087,9 @@ export default function ServerHome(props: Props) {
             <div className="sh-more">
               <div className="sh-more-bar">
                 <span className="sh-more-bar-title">服务器信息</span>
-                <button className="sh-more-close" type="button" onClick={() => setMoreOpen(false)} title="关闭">
+                <Button className="sh-more-close btn-semi" htmlType="button" onClick={() => setMoreOpen(false)} title="关闭">
                   <IconClose size="small" />
-                </button>
+                </Button>
               </div>
 
               <div className="sh-more-user">
@@ -1115,9 +1135,9 @@ export default function ServerHome(props: Props) {
                   <span className="sh-more-v sh-more-addr-v" title={state.address}>
                     {state.address}
                   </span>
-                  <button className="sh-copy" type="button" onClick={() => void copyAddress()}>
+                  <Button className="sh-copy btn-semi" htmlType="button" onClick={() => void copyAddress()}>
                     复制
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -1130,9 +1150,9 @@ export default function ServerHome(props: Props) {
                 </span>
               </div>
 
-              <button
-                className="sh-leave"
-                type="button"
+              <Button
+                className="sh-leave btn-semi"
+                htmlType="button"
                 onClick={() => {
                   setMoreOpen(false);
                   onDisconnect();
@@ -1140,7 +1160,7 @@ export default function ServerHome(props: Props) {
               >
                 <IconExit size="small" />
                 <span>离开</span>
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -1181,26 +1201,17 @@ export default function ServerHome(props: Props) {
               </div>
             </div>
           </div>
-          <div className="sh-mode-group" role="radiogroup" aria-label="说话方式">
-            {(
-              [
-                { id: 'auto', label: '自动' },
-                { id: 'open', label: '常开' },
-                { id: 'ptt', label: '按住说话' },
-              ] as { id: MicMode; label: string }[]
-            ).map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                role="radio"
-                aria-checked={micMode === m.id}
-                className={`sh-mode-btn${micMode === m.id ? ' on' : ''}`}
-                onClick={() => onMicMode?.(m.id)}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+          <RadioGroup
+            className="sh-mode-group"
+            type="button"
+            value={micMode}
+            aria-label="说话方式"
+            onChange={(e) => onMicMode?.(e.target.value as MicMode)}
+          >
+            <Radio value="auto">自动</Radio>
+            <Radio value="open">常开</Radio>
+            <Radio value="ptt">按住说话</Radio>
+          </RadioGroup>
           {micMode === 'ptt' && (
             <div className="sh-set-hint sh-ptt-hint">
               {micOn && micGain > 0
@@ -1248,41 +1259,41 @@ export default function ServerHome(props: Props) {
                   : []),
               ]}
             >
-              <button
-                className={`sh-icon-btn${stream.sharing !== null ? ' is-live' : ''}`}
-                type="button"
+              <Button
+                className={`sh-icon-btn${stream.sharing !== null ? ' is-live' : ''} btn-semi`}
+                htmlType="button"
                 title={stream.sharing !== null ? '直播中，点击管理' : '开始直播（屏幕 / 摄像头）'}
                 aria-pressed={stream.sharing !== null}
               >
                 <IcMonitor />
-              </button>
+              </Button>
             </Dropdown>
-            <button
-              className="sh-icon-btn"
-              type="button"
+            <Button
+              className="sh-icon-btn btn-semi"
+              htmlType="button"
               title="频道文件"
               onClick={() => setFilesOpen(true)}
             >
               <IconFolder />
-            </button>
-            <button
-              className="sh-icon-btn"
-              type="button"
+            </Button>
+            <Button
+              className="sh-icon-btn btn-semi"
+              htmlType="button"
               title="好友与云聊天"
               aria-pressed={friendsOpen}
               onClick={openFriends}
             >
               <IconUserGroup />
-            </button>
-            <button
-              className="sh-icon-btn"
-              type="button"
+            </Button>
+            <Button
+              className="sh-icon-btn btn-semi"
+              htmlType="button"
               title="设置"
               aria-pressed={settingsOpen}
               onClick={() => setSettingsOpen((v) => !v)}
             >
               <IconSetting />
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -1371,26 +1382,27 @@ export default function ServerHome(props: Props) {
               <div className="sh-emoji-backdrop" onClick={() => setEmojiOpen(false)} />
               <div className="sh-emoji-picker" role="dialog" aria-label="选择表情">
                 {EMOJI_LIST.map((e) => (
-                  <button
+                  <Button
                     key={e.name}
-                    type="button"
-                    className="sh-emoji-item"
+                    htmlType="button"
+                    className="sh-emoji-item btn-semi"
                     title={`:${e.name}:`}
                     aria-label={e.name}
                     onClick={() => insertEmoji(e.char)}
                   >
                     {e.char}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </>
           )}
           <div className="sh-composer-box">
-            <textarea
+            <TextArea
               ref={inputRef}
               className="sh-composer-input"
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              borderless
+              onChange={(value) => setDraft(value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -1402,47 +1414,55 @@ export default function ServerHome(props: Props) {
               rows={1}
             />
             <div className="sh-composer-tools">
-              <button
-                className="sh-tool-btn"
-                type="button"
+              <Button
+                className="sh-tool-btn btn-semi"
+                htmlType="button"
                 title="表情"
                 aria-label="表情"
                 aria-expanded={emojiOpen}
                 onClick={() => setEmojiOpen((v) => !v)}
               >
                 <IcEmoji />
-              </button>
-              <button
-                className="sh-tool-btn"
-                type="button"
+              </Button>
+              <Button
+                className="sh-tool-btn btn-semi"
+                htmlType="button"
                 title="附件"
                 aria-label="附件"
                 onClick={() => Toast.info('该功能正在开发中')}
               >
                 <IcClip />
-              </button>
-              <button
-                className="sh-tool-btn"
-                type="button"
+              </Button>
+              <Button
+                className="sh-tool-btn btn-semi"
+                htmlType="button"
                 title="图片"
                 aria-label="图片"
                 onClick={() => Toast.info('该功能正在开发中')}
               >
                 <IcImage />
-              </button>
+              </Button>
               <span className="sh-composer-spacer" />
               <span className="sh-composer-hint">Enter 发送</span>
-              <button className="sh-send-btn" type="button" onClick={send} disabled={!connected || !draft.trim()}>
+              <Button className="sh-send-btn btn-semi" htmlType="button" onClick={send} disabled={!connected || !draft.trim()}>
                 发送
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </main>
 
       {chanDialog && (
-        <div className="sh-modal-mask" onClick={() => setChanDialog(null)}>
-          <div className="sh-modal sh-modal-form" onClick={(e) => e.stopPropagation()}>
+        <Modal
+          visible
+          onCancel={() => setChanDialog(null)}
+          footer={null}
+          header={null}
+          closable={false}
+          modalContentClass="sh-modal sh-modal-form"
+          width={440}
+          centered
+        >
             <div className="sh-modal-title">
               {chanDialog.mode === 'create'
                 ? '新建频道'
@@ -1457,24 +1477,25 @@ export default function ServerHome(props: Props) {
             <div className="sh-form">
               <label className="sh-form-row">
                 <span className="sh-form-label">名称</span>
-                <input
+                <Input
                   className="sh-form-input"
                   value={chanForm.name}
                   maxLength={60}
                   autoFocus
-                  onChange={(e) => setChanForm((f) => ({ ...f, name: e.target.value }))}
+                  onChange={(value) => setChanForm((f) => ({ ...f, name: value }))}
                   placeholder="频道名称"
                 />
               </label>
 
               <label className="sh-form-row">
                 <span className="sh-form-label">描述</span>
-                <textarea
+                <TextArea
                   className="sh-form-input sh-form-textarea"
                   value={chanForm.description}
                   maxLength={300}
                   rows={2}
-                  onChange={(e) => setChanForm((f) => ({ ...f, description: e.target.value }))}
+                  borderless
+                  onChange={(value) => setChanForm((f) => ({ ...f, description: value }))}
                   placeholder="可选，显示在频道头部"
                 />
               </label>
@@ -1482,59 +1503,59 @@ export default function ServerHome(props: Props) {
               {chanDialog.mode === 'create' && (
                 <label className="sh-form-row">
                   <span className="sh-form-label">父频道</span>
-                  <select
-                    className="sh-form-input"
+                  <Select
+                    className="sh-form-select"
                     value={chanForm.parent}
-                    onChange={(e) => setChanForm((f) => ({ ...f, parent: Number(e.target.value) }))}
+                    onChange={(value) => setChanForm((f) => ({ ...f, parent: Number(value) }))}
                   >
-                    <option value={0}>（根目录）</option>
+                    <Select.Option value={0}>（根目录）</Select.Option>
                     {flat
                       .filter((r) => !r.channel.spacer)
                       .map(({ channel, depth }) => (
-                        <option key={channel.id} value={channel.id}>
+                        <Select.Option key={channel.id} value={channel.id}>
                           {'　'.repeat(depth) + (channel.display || channel.name)}
-                        </option>
+                        </Select.Option>
                       ))}
-                  </select>
+                  </Select>
                 </label>
               )}
 
               <div className="sh-form-row">
                 <span className="sh-form-label">类型</span>
-                <select
-                  className="sh-form-input"
+                <Select
+                  className="sh-form-select"
                   value={chanForm.kind}
-                  onChange={(e) => setChanForm((f) => ({ ...f, kind: e.target.value as ChannelKind }))}
+                  onChange={(value) => setChanForm((f) => ({ ...f, kind: value as ChannelKind }))}
                 >
-                  <option value="permanent">永久</option>
-                  <option value="semi">半永久</option>
-                  <option value="temporary">临时</option>
-                </select>
+                  <Select.Option value="permanent">永久</Select.Option>
+                  <Select.Option value="semi">半永久</Select.Option>
+                  <Select.Option value="temporary">临时</Select.Option>
+                </Select>
               </div>
 
               <div className="sh-form-row">
                 <span className="sh-form-label">编解码</span>
-                <select
-                  className="sh-form-input"
+                <Select
+                  className="sh-form-select"
                   value={chanForm.codec}
-                  onChange={(e) => setChanForm((f) => ({ ...f, codec: Number(e.target.value) }))}
+                  onChange={(value) => setChanForm((f) => ({ ...f, codec: Number(value) }))}
                 >
-                  <option value={4}>Opus Voice</option>
-                  <option value={5}>Opus Music</option>
-                </select>
+                  <Select.Option value={4}>Opus Voice</Select.Option>
+                  <Select.Option value={5}>Opus Music</Select.Option>
+                </Select>
               </div>
 
               <div className="sh-form-row">
                 <span className="sh-form-label">音质</span>
                 <div className="sh-form-inline">
-                  <input
+                  <Slider
                     className="sh-form-range"
-                    type="range"
                     min={0}
                     max={10}
                     step={1}
                     value={chanForm.quality}
-                    onChange={(e) => setChanForm((f) => ({ ...f, quality: Number(e.target.value) }))}
+                    aria-label="音质"
+                    onChange={(value) => setChanForm((f) => ({ ...f, quality: Number(value) }))}
                   />
                   <span className="sh-form-val">{chanForm.quality}</span>
                 </div>
@@ -1543,12 +1564,13 @@ export default function ServerHome(props: Props) {
               <div className="sh-form-row">
                 <span className="sh-form-label">最大人数</span>
                 <div className="sh-form-inline">
-                  <input
+                  <InputNumber
                     className="sh-form-input"
-                    type="number"
                     min={-1}
                     value={chanForm.maxClients}
-                    onChange={(e) => setChanForm((f) => ({ ...f, maxClients: Number(e.target.value) }))}
+                    hideButtons
+                    aria-label="最大人数"
+                    onChange={(value) => setChanForm((f) => ({ ...f, maxClients: Number(value) }))}
                   />
                   <span className="sh-form-hint">-1 表示不限</span>
                 </div>
@@ -1556,24 +1578,23 @@ export default function ServerHome(props: Props) {
 
               <div className="sh-form-row">
                 <span className="sh-form-label">密码</span>
-                <label className="sh-form-check">
-                  <input
-                    type="checkbox"
-                    checked={chanForm.password}
-                    onChange={(e) => setChanForm((f) => ({ ...f, password: e.target.checked }))}
-                  />
-                  <span>设置频道密码</span>
-                </label>
+                <Checkbox
+                  className="sh-form-check"
+                  checked={chanForm.password}
+                  onChange={(e) => setChanForm((f) => ({ ...f, password: !!e.target.checked }))}
+                >
+                  设置频道密码
+                </Checkbox>
               </div>
 
               {chanForm.password && (
                 <label className="sh-form-row">
                   <span className="sh-form-label">{chanDialog.mode === 'edit' ? '新密码' : '密码'}</span>
-                  <input
+                  <Input
                     className="sh-form-input"
-                    type="password"
+                    mode="password"
                     value={chanForm.newPassword}
-                    onChange={(e) => setChanForm((f) => ({ ...f, newPassword: e.target.value }))}
+                    onChange={(value) => setChanForm((f) => ({ ...f, newPassword: value }))}
                     placeholder={chanDialog.mode === 'edit' ? '留空则不修改原密码' : '频道密码'}
                   />
                 </label>
@@ -1581,46 +1602,60 @@ export default function ServerHome(props: Props) {
             </div>
 
             <div className="sh-modal-actions">
-              <button className="sh-btn-ghost" type="button" onClick={() => setChanDialog(null)}>
+              <Button className="sh-btn-ghost btn-semi" htmlType="button" onClick={() => setChanDialog(null)}>
                 取消
-              </button>
-              <button className="sh-btn-primary" type="button" onClick={submitChannel}>
+              </Button>
+              <Button className="sh-btn-primary btn-semi" htmlType="button" onClick={submitChannel}>
                 {chanDialog.mode === 'create' ? '创建' : '保存'}
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {deleteTarget && (
-        <div className="sh-modal-mask" onClick={() => setDeleteTarget(null)}>
-          <div className="sh-modal" onClick={(e) => e.stopPropagation()}>
+        <Modal
+          visible
+          onCancel={() => setDeleteTarget(null)}
+          footer={null}
+          header={null}
+          closable={false}
+          modalContentClass="sh-modal"
+          width={360}
+          centered
+        >
             <div className="sh-modal-title">删除「{deleteTarget.display || deleteTarget.name}」</div>
             <div className="sh-modal-desc">
               会连同其子频道一起删除，频道里的人会被移到默认频道。此操作不可撤销。
             </div>
             <div className="sh-modal-actions">
-              <button className="sh-btn-ghost" type="button" onClick={() => setDeleteTarget(null)}>
+              <Button className="sh-btn-ghost btn-semi" htmlType="button" onClick={() => setDeleteTarget(null)}>
                 取消
-              </button>
-              <button className="sh-btn-danger" type="button" onClick={confirmDeleteChannel}>
+              </Button>
+              <Button className="sh-btn-danger btn-semi" htmlType="button" onClick={confirmDeleteChannel}>
                 删除
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {pwChannel && (
-        <div className="sh-modal-mask" onClick={() => setPwChannel(null)}>
-          <div className="sh-modal" onClick={(e) => e.stopPropagation()}>
+        <Modal
+          visible
+          onCancel={() => setPwChannel(null)}
+          footer={null}
+          header={null}
+          closable={false}
+          modalContentClass="sh-modal"
+          width={360}
+          centered
+        >
             <div className="sh-modal-title">加入「{pwChannel.display || pwChannel.name}」</div>
             <div className="sh-modal-desc">这个频道有密码，请输入后加入。</div>
-            <input
+            <Input
               className="sh-modal-input"
-              type="password"
+              mode="password"
               value={pwValue}
-              onChange={(e) => setPwValue(e.target.value)}
+              onChange={(value) => setPwValue(value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') submitPassword();
               }}
@@ -1628,15 +1663,14 @@ export default function ServerHome(props: Props) {
               autoFocus
             />
             <div className="sh-modal-actions">
-              <button className="sh-btn-ghost" type="button" onClick={() => setPwChannel(null)}>
+              <Button className="sh-btn-ghost btn-semi" htmlType="button" onClick={() => setPwChannel(null)}>
                 取消
-              </button>
-              <button className="sh-btn-primary" type="button" onClick={submitPassword}>
+              </Button>
+              <Button className="sh-btn-primary btn-semi" htmlType="button" onClick={submitPassword}>
                 加入
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* 频道文件区：右侧抽屉，复用旧 FilesPanel，浏览/上传/下载/改名/删除/建目录 */}

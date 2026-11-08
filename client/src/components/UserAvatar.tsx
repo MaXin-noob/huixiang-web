@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
+import { Avatar as SemiAvatar } from '@douyinfe/semi-ui';
 import { avatarColor, initial } from '../ui';
 
 interface Props {
@@ -32,23 +33,16 @@ export default function UserAvatar({ name, sources = [], colorKey, className = '
   const src = sources[index];
 
   const inner = (
-    <span
+    <SemiAvatar
       className={className}
+      shape="circle"
+      src={src}
+      alt={label ?? ''}
       style={{ background: avatarColor(colorKey), ...(live && size ? { width: size, height: size } : null), ...style }}
-      aria-hidden={label ? undefined : true}
-      title={label}
+      onError={() => setIndex((i) => i + 1)}
     >
       {initial(name)}
-      {src && (
-        <img
-          src={src}
-          alt={label ?? ''}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => setIndex((i) => i + 1)}
-        />
-      )}
-    </span>
+    </SemiAvatar>
   );
 
   if (!live) return inner;

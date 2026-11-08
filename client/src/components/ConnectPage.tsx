@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Input, Toast } from '@douyinfe/semi-ui';
+import { Button, Checkbox, Input, Tabs, Toast } from '@douyinfe/semi-ui';
 import { IconGlobe, IconKey, IconLock, IconServer, IconUser } from '@douyinfe/semi-icons';
 import { accountErrorText } from '../account';
 import {
@@ -47,9 +47,9 @@ const inputStyle = { height: 48 };
 /** 密码类输入框右侧的眼睛按钮：睁眼=明文，闭眼（带斜杠）=已遮挡 */
 function RevealButton({ shown, onToggle }: { shown: boolean; onToggle: () => void }) {
   return (
-    <button
-      type="button"
-      className="login-reveal"
+    <Button
+      htmlType="button"
+      className="login-reveal btn-semi"
       aria-label={shown ? '隐藏' : '显示'}
       title={shown ? '隐藏' : '显示'}
       onClick={onToggle}
@@ -86,7 +86,7 @@ function RevealButton({ shown, onToggle }: { shown: boolean; onToggle: () => voi
           />
         </svg>
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -412,10 +412,10 @@ export default function ConnectPage({
       {recent.length > 0 ? (
         <div className="recent-list">
           {recent.map((r) => (
-            <button key={r} type="button" className="recent-item" onClick={() => setAddress(r)}>
+            <Button key={r} htmlType="button" className="recent-item btn-semi" onClick={() => setAddress(r)}>
               <IconServer size="small" />
               <span>{r}</span>
-            </button>
+            </Button>
           ))}
         </div>
       ) : (
@@ -435,26 +435,16 @@ export default function ConnectPage({
               <span className="brand-name">回响</span>
             </div>
 
-            <div className="login-tabs" role="tablist" aria-label="登录方式">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === 'account'}
-                className={`login-tab${mode === 'account' ? ' is-active' : ''}`}
-                onClick={() => setMode('account')}
-              >
-                MyTeamSpeak 登录
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === 'guest'}
-                className={`login-tab${mode === 'guest' ? ' is-active' : ''}`}
-                onClick={() => setMode('guest')}
-              >
-                游客登录
-              </button>
-            </div>
+            <Tabs
+              className="login-tabs"
+              type="button"
+              activeKey={mode}
+              onChange={(key) => setMode(key as 'account' | 'guest')}
+              tabList={[
+                { itemKey: 'account', tab: 'MyTeamSpeak 登录' },
+                { itemKey: 'guest', tab: '游客登录' },
+              ]}
+            />
 
             <h1 className="login-title">
               {mode === 'account' ? (signedIn ? '选择服务器' : 'MyTeamSpeak 登录') : '游客登录'}
@@ -476,12 +466,12 @@ export default function ConnectPage({
                       <span className="login-account-sub">{account.email || '已登录'}</span>
                     </div>
                     <div className="login-account-links">
-                      <button type="button" className="field-link" onClick={onAccountRefresh}>
+                      <Button htmlType="button" className="field-link btn-semi" onClick={onAccountRefresh}>
                         刷新
-                      </button>
-                      <button type="button" className="field-link" onClick={onAccountLogout}>
+                      </Button>
+                      <Button htmlType="button" className="field-link btn-semi" onClick={onAccountLogout}>
                         切换账号
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -543,40 +533,38 @@ export default function ConnectPage({
                             maxLength={64}
                           />
                         </div>
-                        <label className="login-remember">
-                          <input
-                            type="checkbox"
-                            checked={remember}
-                            onChange={(e) => toggleRemember(e.target.checked)}
-                          />
-                          <span>记住密码</span>
-                        </label>
+                        <Checkbox
+                          className="login-remember"
+                          checked={remember}
+                          onChange={(e) => toggleRemember(!!e.target.checked)}
+                        >
+                          记住密码
+                        </Checkbox>
                       </>
                     ) : (
                       // 没展开两步验证时，验证入口和「记住密码」并排一行
                       <div className="login-extras">
-                        <button type="button" className="field-link login-otp-link" onClick={() => setShowOtp(true)}>
+                        <Button htmlType="button" className="field-link login-otp-link btn-semi" onClick={() => setShowOtp(true)}>
                           账号开启了两步验证？
-                        </button>
-                        <label className="login-remember">
-                          <input
-                            type="checkbox"
-                            checked={remember}
-                            onChange={(e) => toggleRemember(e.target.checked)}
-                          />
-                          <span>记住密码</span>
-                        </label>
+                        </Button>
+                        <Checkbox
+                          className="login-remember"
+                          checked={remember}
+                          onChange={(e) => toggleRemember(!!e.target.checked)}
+                        >
+                          记住密码
+                        </Checkbox>
                       </div>
                     )}
 
-                    <button
-                      type="button"
-                      className="login-submit"
+                    <Button
+                      htmlType="button"
+                      className="login-submit btn-semi"
                       disabled={!canLogin || loggingIn}
                       onClick={submitLogin}
                     >
                       {loggingIn ? '正在登录…' : '登录'}
-                    </button>
+                    </Button>
                   </>
                 )}
 
@@ -596,10 +584,10 @@ export default function ConnectPage({
                       ) : (
                         <div className="saved-list">
                           {bookmarks.items.map((bookmark) => (
-                            <button
+                            <Button
                               key={bookmark.id}
-                              type="button"
-                              className="saved-item"
+                              htmlType="button"
+                              className="saved-item btn-semi"
                               onClick={() => applyBookmark(bookmark)}
                               title={`填入 ${bookmark.address}`}
                             >
@@ -613,7 +601,7 @@ export default function ConnectPage({
                                   <IconKey size="small" />
                                 </span>
                               )}
-                            </button>
+                            </Button>
                           ))}
                         </div>
                       )}
@@ -622,14 +610,14 @@ export default function ConnectPage({
                     <div className="login-field">{addressField}</div>
                     <div className="login-field">{middlePasswordField}</div>
 
-                    <button
-                      type="button"
-                      className="login-submit"
+                    <Button
+                      htmlType="button"
+                      className="login-submit btn-semi"
                       disabled={!canConnect || connecting}
                       onClick={submit}
                     >
                       {connecting ? '正在进入服务器…' : `以 ${account.username || account.email} 身份进入服务器`}
-                    </button>
+                    </Button>
                   </>
                 )}
 
@@ -654,24 +642,23 @@ export default function ConnectPage({
                 <div className="login-field">{middlePasswordField}</div>
                 {tokenField}
 
-                <button type="button" className="login-submit" disabled={!canConnect || connecting} onClick={submit}>
+                <Button htmlType="button" className="login-submit btn-semi" disabled={!canConnect || connecting} onClick={submit}>
                   {connecting ? '正在连接…' : '以游客身份进入'}
-                </button>
+                </Button>
               </>
             )}
 
-            <label className="login-agree">
-              <input
-                type="checkbox"
-                checked={agreed}
-                onChange={(e) => {
-                  setAgreed(e.target.checked);
-                }}
-              />
+            <Checkbox
+              className="login-agree"
+              checked={agreed}
+              onChange={(e) => {
+                setAgreed(!!e.target.checked);
+              }}
+            >
               <span>
                 我已阅读并同意 <b>用户服务协议</b> 和 <b>隐私政策</b>
               </span>
-            </label>
+            </Checkbox>
 
             {mode === 'guest' && recentBlock}
 
@@ -684,15 +671,15 @@ export default function ConnectPage({
                 </div>
                 <div className="login-socials">
                   {SOCIALS.map((social) => (
-                    <button
+                    <Button
                       key={social.id}
-                      type="button"
-                      className="login-social"
+                      htmlType="button"
+                      className="login-social btn-semi"
                       onClick={() => Toast.info({ content: '该功能正在开发中，敬请期待', duration: 2.5 })}
                     >
                       {social.icon}
                       {social.label}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </>
