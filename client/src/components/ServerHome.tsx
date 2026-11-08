@@ -94,6 +94,10 @@ interface Props {
   onLoadMoreChat: () => void;
   avatarToken: string;
   account: AccountState;
+  /** 上传 / 更换 myTeamSpeak 账号头像（文件选择后交给 account.ts 压图并 POST）。 */
+  onAvatarChange?: (file: File) => void | Promise<void>;
+  /** 删除 myTeamSpeak 账号头像。 */
+  onAvatarRemove?: () => void | Promise<void>;
   /** 浏览器 ↔ 网关的 WebSocket 往返（ms），未知为 null。 */
   pingGateway: number | null;
   /** 网关 ↔ TeamSpeak 的 UDP 往返（ms），未知为 null。 */
@@ -376,6 +380,8 @@ export default function ServerHome(props: Props) {
     onLoadMoreChat,
     avatarToken,
     account,
+    onAvatarChange,
+    onAvatarRemove,
     pingGateway,
     pingServer,
     micOn,
@@ -444,6 +450,9 @@ export default function ServerHome(props: Props) {
   const [query, setQuery] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 设置页里的账号头像：隐藏的文件选择框、上传/删除进行中的标志（防重复点击）。
+  const avatarFileRef = useRef<HTMLInputElement | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [pwChannel, setPwChannel] = useState<ChannelNode | null>(null);
   const [pwValue, setPwValue] = useState('');
   // 频道管理：新建/编辑表单、删除确认、行内「更多」菜单。
@@ -826,6 +835,37 @@ export default function ServerHome(props: Props) {
   const banner = info?.bannerUrl ?? null;
 
   const ownMember = findMember(state.tree, state.ownId);
+
+  // 设置页「个人资料」：点头像区的按钮触发隐藏的 file input；选中图片后交给上层压图上传。
+  const pickAvatar = () => avatarFileRef.current?.click();
+  const onAvatarFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // 清空，允许再次选择同一张图
+    if (!file) return;
+    setAvatarBusy(true);
+    try {
+      await onAvatarChange?.(file);
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+  const confirmRemoveAvatar = () => {
+    Modal.confirm({
+      title: '删除账号头像',
+      content: '删除后将以昵称首字母显示，确定删除吗？',
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { type: 'danger' },
+      onOk: async () => {
+        setAvatarBusy(true);
+        try {
+          await onAvatarRemove?.();
+        } finally {
+          setAvatarBusy(false);
+        }
+      },
+    });
+  };
 
   const copyAddress = async () => {
     try {
@@ -1340,6 +1380,44 @@ export default function ServerHome(props: Props) {
         className="files-sheet"
       >
         <div className="files-body">
+          <div className="files-sub">个人资料</div>
+          <div className="sh-avatar-row">
+            <Avatar
+              id={state.ownId}
+              name={ownMember?.nickname || state.nickname || account.username || '我'}
+              ownId={state.ownId}
+              avatarToken={avatarToken}
+              accountAvatar={account.avatarUrl}
+              size={64}
+            />
+            <div className="sh-avatar-info">
+              <div className="sh-set-label">
+                {account.phase === 'signedIn' ? account.username || state.nickname : state.nickname || '游客'}
+              </div>
+              <div className="sh-set-desc">
+                {account.phase === 'signedIn'
+                  ? account.email || '设置一张头像，服务器与其他客户端都能看到。'
+                  : '游客身份没有账号头像，登录 myTeamSpeak 后即可上传。'}
+              </div>
+              {account.phase === 'signedIn' && (
+                <div className="sh-avatar-actions">
+                  <input ref={avatarFileRef} type="file" accept="image/*" hidden onChange={onAvatarFile} />
+                  <Button size="small" disabled={avatarBusy} onClick={pickAvatar}>
+                    {account.avatarUrl ? '更换头像' : '上传头像'}
+                  </Button>
+                  {account.avatarUrl && (
+                    <Button size="small" type="danger" disabled={avatarBusy} onClick={confirmRemoveAvatar}>
+                      删除头像
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          {account.phase !== 'signedIn' && (
+            <div className="sh-set-hint">提示：头像属于 myTeamSpeak 账号，先在连接页登录后再来设置。</div>
+          )}
+
           <div className="files-sub">通知</div>
           <div className="sh-set-row">
             <div className="sh-set-row-text">

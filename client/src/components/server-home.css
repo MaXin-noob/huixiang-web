@@ -1404,6 +1404,26 @@
   color: #d97706;
 }
 
+/* 设置页 · 个人资料（账号头像上传 / 更换 / 删除） */
+.sh-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 2px 0 10px;
+}
+
+.sh-avatar-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.sh-avatar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 /* 说话方式分段选择 */
 .sh-mode-group {
   display: flex;
