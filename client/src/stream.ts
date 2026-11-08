@@ -199,29 +199,6 @@ export class StreamClient {
     this.begin(stream, 2);
   }
 
-  /** 共享摄像头。不带麦克风：频道语音已经在用，再采一次会回声。 */
-  async startCamera() {
-    if (this.state.sharing || this.starting) return;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      this.update({ error: '这个浏览器打不开摄像头' });
-      return;
-    }
-    this.starting = true;
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } },
-        audio: false,
-      });
-    } catch (e) {
-      this.starting = false;
-      const why = e instanceof Error ? e.message : String(e);
-      this.update({ error: `打不开摄像头：${why}` });
-      return;
-    }
-    this.begin(stream, 1);
-  }
-
   private begin(stream: MediaStream, kind: ShareKind) {
     this.starting = false;
     this.local = stream;
