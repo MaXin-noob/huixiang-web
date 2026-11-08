@@ -1905,3 +1905,302 @@
 .sh-btn-danger:hover {
   background: #c22b33;
 }
+
+/* ================= 移动端：频道页 / 聊天页 ================= */
+.sh-mobile-back,
+.sh-tip-mobile {
+  display: none;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sh-rail {
+    flex: 0 0 270px;
+    width: 270px;
+  }
+
+  .sh-chat-head {
+    padding: 0 16px;
+  }
+
+  .sh-messages {
+    padding: 16px;
+  }
+
+  .sh-composer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (max-width: 767px) {
+  .sh-shell {
+    display: block;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .sh-shell[data-mobile-pane='channels'] .sh-chat {
+    display: none;
+  }
+
+  /* 聊天页保留左栏底部的自己状态栏（麦克风/扬声器/暂离），
+     让手机用户聊天时也能快速控制语音。 */
+  .sh-shell[data-mobile-pane='chat'] .sh-rail {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: auto;
+    z-index: 25;
+    background: #fff;
+    border-top: 1px solid var(--sh-line-soft);
+  }
+
+  .sh-shell[data-mobile-pane='chat'] .sh-rail-head,
+  .sh-shell[data-mobile-pane='chat'] .sh-rail-body {
+    display: none;
+  }
+
+  .sh-shell[data-mobile-pane='chat'] .sh-chat {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+
+  .sh-tip-desktop {
+    display: none;
+  }
+
+  .sh-tip-mobile {
+    display: inline;
+  }
+
+  .sh-rail {
+    width: 100%;
+    height: 100%;
+    flex: none;
+    border-right: none;
+  }
+
+  .sh-chat {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* 左栏：手机上把服务器头部和信息区收紧 */
+  .sh-rail-head {
+    gap: 10px;
+    padding: 14px 14px 12px;
+  }
+
+  /* 移动端触控目标：底部栏、搜索、区块“+”、频道操作都放大到手指可点 */
+  .sh-more-btn {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .sh-status-search {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .sh-sec-plus {
+    width: 32px;
+    height: 32px;
+  }
+
+  .sh-me-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .sh-chan-chevron {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+  }
+
+  .sh-chan-more {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+  }
+
+  .sh-server-name {
+    font-size: 17px;
+  }
+
+  .sh-server-addr {
+    font-size: 11.5px;
+  }
+
+  .sh-server-banner {
+    height: 120px;
+    border-radius: 10px;
+  }
+
+  .sh-rail-body {
+    padding: 8px 10px 10px;
+  }
+
+  .sh-me {
+    gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .sh-me-actions {
+    gap: 4px;
+  }
+
+  /* 聊天头部：返回按钮 + 简化操作区 */
+  .sh-chat-head {
+    flex: 0 0 56px;
+    height: 56px;
+    gap: 8px;
+    padding: 0 12px;
+  }
+
+  .sh-mobile-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    margin-left: -4px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--sh-text-2);
+  }
+
+  .sh-mobile-back:hover {
+    background: var(--sh-field);
+  }
+
+  .sh-chat-name {
+    font-size: 15px;
+  }
+
+  .sh-chat-sub {
+    font-size: 11px;
+  }
+
+  .sh-chat-actions {
+    gap: 4px;
+  }
+
+  .sh-icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  /* 消息区 */
+  .sh-messages {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .sh-messages.sh-ai-messages {
+    padding: 0 4px 10px;
+  }
+
+  .sh-aidialogue .semi-ai-chat-dialogue-wrapper {
+    padding: 8px 6px;
+  }
+
+  .sh-aidialogue .semi-ai-chat-dialogue-avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .sh-msg {
+    gap: 8px;
+  }
+
+  .sh-msg-text {
+    font-size: 14px;
+  }
+
+  /* 输入区：适配底部安全区和较短的手机可用高度 */
+  .sh-composer {
+    padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .sh-composer-box {
+    gap: 6px;
+    padding: 8px 8px 8px 10px;
+    border-radius: 12px;
+  }
+
+  .sh-composer-input,
+  .sh-composer-input .semi-input-textarea {
+    min-height: 44px;
+    max-height: 120px;
+  }
+
+  .sh-composer-input .semi-input-textarea {
+    padding: 0;
+  }
+
+  .sh-composer-hint {
+    display: none;
+  }
+
+  .sh-composer-tools {
+    overflow-x: auto;
+  }
+
+  .sh-send-btn {
+    height: 36px;
+    min-width: 58px;
+    padding: 0 14px;
+  }
+
+  .sh-emoji-picker {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  /* 弹窗 / 侧栏在手机上不要超出屏幕 */
+  .sh-modal,
+  .sh-modal-form {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    max-height: 88dvh;
+  }
+
+  .sh-modal-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .sh-modal-actions .sh-btn-primary,
+  .sh-modal-actions .sh-btn-ghost {
+    width: 100%;
+  }
+
+  .files-sheet .semi-sidesheet-inner,
+  .friends-sheet .semi-sidesheet-inner {
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
+
+  .sh-more {
+    top: 52px;
+    left: 10px;
+    right: 10px;
+    padding: 14px;
+  }
+}
+
+@media (hover: none) and (max-width: 767px) {
+  /* 触屏没有 hover：频道行操作常显，避免用户找不到 */
+  .sh-chan-more {
+    opacity: 1;
+  }
+}

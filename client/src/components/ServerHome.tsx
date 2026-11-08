@@ -31,6 +31,7 @@ import {
   IconUserGroup,
   IconFolder,
   IconChevronDown,
+  IconChevronLeft,
   IconChevronRight,
   IconLock,
   IconClose,
@@ -442,6 +443,8 @@ export default function ServerHome(props: Props) {
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
+  /** 移动端：频道页 / 聊天页。桌面端由 CSS 忽略，不影响双栏布局。 */
+  const [mobilePane, setMobilePane] = useState<'channels' | 'chat'>('channels');
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const dlgRef = useRef<AIChatDialogue | null>(null);
@@ -576,13 +579,18 @@ export default function ServerHome(props: Props) {
     });
 
   const tryJoin = (ch: ChannelNode) => {
-    if (ch.spacer || ch.id === state.ownChannel) return;
+    if (ch.spacer) return;
+    if (ch.id === state.ownChannel) {
+      setMobilePane('chat');
+      return;
+    }
     if (ch.password) {
       setPwValue('');
       setPwChannel(ch);
       return;
     }
     onJoinChannel(ch.id);
+    setMobilePane('chat');
   };
 
   const submitPassword = () => {
@@ -590,6 +598,7 @@ export default function ServerHome(props: Props) {
     onJoinChannel(pwChannel.id, pwValue);
     setPwChannel(null);
     setPwValue('');
+    setMobilePane('chat');
   };
 
   // —— 频道管理：新建 / 编辑 / 删除 ——
@@ -712,7 +721,7 @@ export default function ServerHome(props: Props) {
   };
 
   return (
-    <div className="sh-shell">
+    <div className="sh-shell" data-mobile-pane={mobilePane}>
       {/* ================= 左栏 ================= */}
       <aside className="sh-rail">
         <header className="sh-rail-head">
@@ -836,6 +845,9 @@ export default function ServerHome(props: Props) {
                   htmlType="button"
                   title={selected ? '当前所在频道' : '双击进入频道'}
                   onDoubleClick={() => tryJoin(channel)}
+                  onClick={() => {
+                    if (window.matchMedia('(max-width: 767px)').matches) tryJoin(channel);
+                  }}
                 >
                   <span
                     className={`sh-chan-chevron${hasClients ? '' : ' empty'}`}
@@ -984,7 +996,8 @@ export default function ServerHome(props: Props) {
 
           <div className="sh-tip">
             <IcInfo />
-            <span>双击频道即可进入</span>
+            <span className="sh-tip-desktop">双击频道即可进入</span>
+            <span className="sh-tip-mobile">点击频道即可进入</span>
           </div>
         </div>
 
@@ -1226,6 +1239,15 @@ export default function ServerHome(props: Props) {
       {/* ================= 右栏 ================= */}
       <main className="sh-chat">
         <header className="sh-chat-head">
+          <Button
+            className="sh-mobile-back btn-semi"
+            htmlType="button"
+            title="返回频道列表"
+            aria-label="返回频道列表"
+            onClick={() => setMobilePane('channels')}
+          >
+            <IconChevronLeft size="small" />
+          </Button>
           <div className="sh-chat-title">
             <div className="sh-chat-title-row">
               <span className="sh-hash">#</span>
