@@ -31,6 +31,7 @@ import {
   IconUserGroup,
   IconFolder,
   IconChevronDown,
+  IconChevronUp,
   IconChevronLeft,
   IconChevronRight,
   IconLock,
@@ -944,10 +945,10 @@ export default function ServerHome(props: Props) {
                         <Dropdown.Item icon={<IconEdit />} onClick={() => openEditChannel(channel)}>
                           <span className="sh-dd-label">编辑频道</span>
                         </Dropdown.Item>
-                        <Dropdown.Item disabled={!canMoveUp} onClick={() => moveChannel(channel, -1)}>
+                        <Dropdown.Item icon={<IconChevronUp />} disabled={!canMoveUp} onClick={() => moveChannel(channel, -1)}>
                           <span className="sh-dd-label">上移</span>
                         </Dropdown.Item>
-                        <Dropdown.Item disabled={!canMoveDown} onClick={() => moveChannel(channel, 1)}>
+                        <Dropdown.Item icon={<IconChevronDown />} disabled={!canMoveDown} onClick={() => moveChannel(channel, 1)}>
                           <span className="sh-dd-label">下移</span>
                         </Dropdown.Item>
                         <Dropdown.Divider />
