@@ -961,6 +961,17 @@
   padding: 2px 0;
 }
 
+/* 覆盖 Semi TextArea 包裹层的默认底色：
+   semi 自带 hover→fill-1、:active→fill-2、:focus→fill-0，会在聚焦/点按时露出一块灰底 */
+.sh-composer-box .sh-composer-input,
+.sh-composer-box .sh-composer-input:hover,
+.sh-composer-box .sh-composer-input:active,
+.sh-composer-box .sh-composer-input:focus-within,
+.sh-composer-box .sh-composer-input.semi-input-textarea-wrapper-focus {
+  background: transparent;
+  border: none;
+}
+
 .sh-composer-input::placeholder {
   color: var(--sh-text-4);
 }
