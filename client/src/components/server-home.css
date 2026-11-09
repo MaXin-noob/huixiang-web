@@ -854,6 +854,37 @@
   border-radius: 12px;
 }
 
+/* 长消息自动换行：超长不可断词（base64、长 URL、file_id 等）也强制折行，避免撑出横向滚动条 */
+.sh-aidialogue .semi-ai-chat-dialogue-content,
+.sh-aidialogue .semi-ai-chat-dialogue-content-bubble,
+.sh-aidialogue .semi-ai-chat-dialogue-content-userBubble,
+.sh-aidialogue .semi-ai-chat-dialogue-content-no-bubble {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.sh-aidialogue .semi-ai-chat-dialogue-content-inner,
+.sh-aidialogue .semi-markdownRender {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 代码块保留等宽、自带横向滚动，不强行折行 */
+.sh-aidialogue .semi-ai-chat-dialogue-content-bubble pre,
+.sh-aidialogue .semi-ai-chat-dialogue-content-no-bubble pre {
+  overflow-wrap: normal;
+  word-break: normal;
+  overflow-x: auto;
+}
+
+/* 消息列表不该出现横向滚动条，兜底隐藏 */
+.sh-aidialogue .semi-ai-chat-dialogue-list {
+  overflow-x: hidden;
+}
+
 .sh-day-divider {
   display: flex;
   justify-content: center;
