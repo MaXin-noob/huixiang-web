@@ -1,0 +1,22 @@
+# Caddy 反代：同一个域名下
+#   /rtc*  -> LiveKit 的 WebSocket（客户端 SDK 默认连 wss://域名/rtc）
+#   其它   -> Ktor 网关（网页 + /ws + 文件接口）
+#
+# 证书由 Caddy 自动申请（需 80/443 可访问、域名已解析到本机）。
+{$DOMAIN} {
+	encode zstd gzip
+
+	@livekit path /rtc /rtc/*
+	handle @livekit {
+		reverse_proxy livekit:7880
+	}
+
+	handle {
+		reverse_proxy gateway:8080
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -249,6 +249,77 @@ fun Application.gateway(dist: File, access: Access, history: ChannelHistory) {
         get("/healthz") { call.respondText("ok") }
 
         /**
+         * Web-only 直播：给这个标签页签一个只能进「本频道房间」的 LiveKit JWT。
+         * API secret 只在服务端，浏览器拿不到；观众和主播拿到的 token 权限不同（canPublish）。
+         */
+        post("/rtc/token") {
+            if (!access.originAllowed(call)) {
+                call.respond(HttpStatusCode.Forbidden, "origin not allowed")
+                return@post
+            }
+            val session = call.fileSession()
+            if (session == null) {
+                call.respondText(
+                    """{"ok":false,"error":"会话已结束，刷新页面再连一次"}""",
+                    io.ktor.http.ContentType.Application.Json,
+                    HttpStatusCode.Unauthorized,
+                )
+                return@post
+            }
+            val body = try {
+                Json.parse(call.receiveText()) as? Map<*, *>
+            } catch (_: Exception) {
+                null
+            }
+            val result = session.liveKitToken(body?.get("publish") == true)
+            val json = if (result.ok) {
+                Json.write(mapOf("ok" to true, "url" to result.url, "token" to result.token))
+            } else {
+                Json.write(mapOf("ok" to false, "error" to result.error))
+            }
+            call.respondText(json, io.ktor.http.ContentType.Application.Json, HttpStatusCode.fromValue(result.status))
+        }
+
+        /**
+         * 主播开始/停止推流的通知（媒体本身走 LiveKit，不经过这里）。
+         * 网关只记下「谁在这个频道直播」，并广播给同频道的其他网页。
+         */
+        post("/rtc/state") {
+            if (!access.originAllowed(call)) {
+                call.respond(HttpStatusCode.Forbidden, "origin not allowed")
+                return@post
+            }
+            val session = call.fileSession()
+            if (session == null) {
+                call.respondText(
+                    """{"ok":false,"error":"会话已结束，刷新页面再连一次"}""",
+                    io.ktor.http.ContentType.Application.Json,
+                    HttpStatusCode.Unauthorized,
+                )
+                return@post
+            }
+            val body = try {
+                Json.parse(call.receiveText()) as? Map<*, *>
+            } catch (_: Exception) {
+                null
+            }
+            val active = body?.get("active") == true
+            val error = if (active) session.webLiveStart() else {
+                session.webLiveStop()
+                null
+            }
+            if (error == null) {
+                call.respondText("""{"ok":true}""", io.ktor.http.ContentType.Application.Json, HttpStatusCode.OK)
+            } else {
+                call.respondText(
+                    Json.write(mapOf("ok" to false, "error" to error)),
+                    io.ktor.http.ContentType.Application.Json,
+                    HttpStatusCode.Conflict,
+                )
+            }
+        }
+
+        /**
          * A session's downloaded ts3image banner. The address carries a per-session token that only the tab the
          * state was pushed to knows, so this is not a door to anyone else's transfer.
          */

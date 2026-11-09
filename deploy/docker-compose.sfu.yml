@@ -1,0 +1,126 @@
+# 回响网页版 + LiveKit（Web-only SFU）单机部署
+#
+# 用法（在 deploy 目录）：
+#   cp .env.sfu.example .env      # 填域名/口令/LiveKit 密钥
+#   docker compose -f docker-compose.sfu.yml up -d --build
+#
+# 端口说明见文件末尾注释。默认用 bridge 网络 + 固定端口映射，
+# 若宿主机性能吃紧/追求最佳 WebRTC 表现，可改成 host 网络（见末尾说明）。
+
+name: huixiang
+
+services:
+  # ── SFU 媒体服务器 ───────────────────────────────────────────────
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    restart: unless-stopped
+    # 官方推荐生产环境用 host 网络；这里先用 bridge + 同号端口映射，
+    # 让 use_external_ip 通过 STUN 拿到公网 IP 后广告的端口与外网一致。
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        bind_addresses:
+          - "0.0.0.0"
+        rtc:
+          tcp_port: 7881
+          port_range_start: 50000
+          port_range_end: 50100
+          # 云主机有公网 IP、但进程看不到时打开；让 LiveKit 用 STUN 发现真实公网地址
+          use_external_ip: true
+        turn:
+          enabled: true
+          # 只开 TURN/UDP；TURN/TLS(5349/443) 需要证书，二期再加
+          udp_port: 3478
+        # webhook: 网关实现 /rtc/webhook 后再启用
+        #   urls: ["http://gateway:8080/rtc/webhook"]
+        #   api_key: ${LIVEKIT_API_KEY}
+        keys:
+          ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+        logging:
+          level: info
+    ports:
+      # 只给反代本机访问，不直接对外
+      - "127.0.0.1:7880:7880"
+      # ICE/TCP 兜底（企业网/禁 UDP）
+      - "7881:7881"
+      # ICE/UDP 媒体端口段（人数越多占用越多；可按并发调小）
+      - "50000-50100:50000-50100/udp"
+      # 内置 TURN/UDP（手机蜂窝网、严格 NAT 必备）
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+    networks:
+      - huixiang
+
+  # ── 网关（Ktor）+ 网页静态文件 ──────────────────────────────────
+  gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: huixiang-web:latest
+    restart: unless-stopped
+    depends_on:
+      livekit:
+        condition: service_started
+    environment:
+      PORT: "8080"
+      HOST: "0.0.0.0"          # 容器内监听所有接口；宿主机只映射 127.0.0.1
+      WEB_DIST: /app/static
+      ACCESS_TOKEN: ${ACCESS_TOKEN}
+      ALLOWED_ORIGINS: https://${DOMAIN}
+      # 供 /rtc/token 签 LiveKit JWT 使用（与 livekit 服务同一对密钥）
+      # 浏览器侧连接地址
+      LIVEKIT_URL: wss://${DOMAIN}
+      # 网关服务端调 LiveKit RoomService 的内部地址（容器网络内）
+      LIVEKIT_API_URL: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - huixiang
+
+  # ── TLS 反向代理（可选）─────────────────────────────────────────
+  # 已有宿主机 Nginx 时不要启用；直接照 deploy/DEPLOY.md 的 Nginx 配置，
+  # 并加一段 location /rtc 转发到 127.0.0.1:7880 即可。
+  # 启用方式：docker compose -f docker-compose.sfu.yml --profile tls up -d
+  caddy:
+    image: caddy:2-alpine
+    profile: ["tls"]
+    restart: unless-stopped
+    depends_on:
+      - gateway
+      - livekit
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile.sfu:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - huixiang
+
+networks:
+  huixiang:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+# ────────────────────────────────────────────────────────────────
+# 端口清单（云安全组 / 防火墙要放行）：
+#   80/tcp     Caddy 申请证书 / 跳转 HTTPS（用 profile tls 时）
+#   443/tcp    网页 + WSS（Caddy 或你的 Nginx）
+#   7880/tcp   仅本机（反代到 /rtc），不要对外
+#   7881/tcp   ICE/TCP 兜底
+#   3478/udp   内置 TURN（+3478/tcp 可选）
+#   50000-50100/udp  WebRTC 媒体
+#
+# 若改用 host 网络（生产推荐，少一层 NAT、性能更好）：
+#   给 livekit 加 `network_mode: host` 并删掉它的 ports；
+#   Caddy 里把 livekit:7880 改成 127.0.0.1:7880；
+#   gateway 的 8080 也改成 127.0.0.1:8080 映射或同样 host。
+#   Windows 的 Docker Desktop 对 host 网络支持不完整，服务器 Linux 再用。

@@ -21,9 +21,10 @@
 
 ```
 浏览器 ──wss://域名──▶ Nginx（TLS 终止，443）──ws──▶ 网关（127.0.0.1:8080）──UDP 9987──▶ TeamSpeak 服务器
+                                    └── /rtc ──▶ LiveKit（127.0.0.1:7880，可选，仅「网页直播」用）
 ```
 
-浏览器打不开 UDP，所以语音和信令都由网关代持。**网关只监听 127.0.0.1，不直接对外**，所有外部流量必须经过 Nginx 的 TLS。
+浏览器打不开 UDP，所以语音和信令都由网关代持。**网关只监听 127.0.0.1，不直接对外**，所有外部流量必须经过 Nginx 的 TLS。LiveKit 也是可选组件：不部署它时，除「网页直播（LiveKit）」以外的功能都能正常用。
 
 ### 先设好这几个变量
 
@@ -99,7 +100,7 @@ node -v && npm -v
 ```bash
 sudo mkdir -p /opt/huixiang
 sudo chown "$USER:$USER" /opt/huixiang
-git clone https://github.com/youareanimal/huixiang.git /opt/huixiang
+git clone https://github.com/MaXin-noob/huixiang-web.git /opt/huixiang
 cd /opt/huixiang
 git log --oneline -1
 ```
@@ -165,7 +166,8 @@ ACCESS_TOKEN=$ACCESS_TOKEN
 ALLOWED_ORIGINS=https://$DOMAIN
 ACCOUNT_REMEMBER_DAYS=30
 LOG_LEVEL=INFO
-EOFsudo chmod 600 /etc/huixiang/env
+EOF
+sudo chmod 600 /etc/huixiang/env
 sudo chown root:root /etc/huixiang/env
 ```
 
@@ -275,6 +277,112 @@ curl -sI https://$DOMAIN/healthz | head -1     # 期望 HTTP/2 200 或 HTTP/1.1 
 
 > 如果域名还没解析到这台机器，certbot 会失败。先加 A 记录、等 DNS 生效（`dig +short $DOMAIN` 能看到本机 IP），再重跑 certbot。
 
+### 8.1 可选：启用网页直播（LiveKit）
+
+不做这一步也能正常用文字、语音、屏幕共享（WebRTC 点对点）和文件；只是聊天区「共享屏幕 - 网页直播（LiveKit）」不可用。**LiveKit 是独立服务，不随网关进程启动。** 同频道支持多人同时开播，观众按人选择看谁的画面。
+
+> 两种装法只能选一种：**A. 在现有 systemd 部署上单独加 LiveKit**（本文默认路径），或 **B. 整套用 `deploy/docker-compose.sfu.yml`**。方式 B 自己会起网关和 Caddy，**不要**和本机的 systemd 网关 / 宿主 Nginx 同时开，8080 与 80/443 会冲突。
+
+#### 方式 A：现有 systemd 部署 + 单独跑 LiveKit
+
+1）生成一对 API Key / Secret（与 LiveKit 配置、网关环境变量必须一致）：
+
+```bash
+export LIVEKIT_API_KEY=$(openssl rand -hex 16)
+export LIVEKIT_API_SECRET=$(openssl rand -hex 32)
+echo "KEY=$LIVEKIT_API_KEY"; echo "SECRET=$LIVEKIT_API_SECRET"   # 记下来
+```
+
+2）写 LiveKit 配置 `/etc/livekit.yaml`（把 `你的KEY` / `你的SECRET` 换掉）：
+
+```bash
+sudo tee /etc/livekit.yaml >/dev/null <<EOF
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: true
+turn:
+  enabled: true
+  udp_port: 3478
+keys:
+  你的KEY: 你的SECRET
+logging:
+  level: info
+EOF
+sudo chmod 600 /etc/livekit.yaml
+```
+
+3）用 Docker 以 **host 网络** 跑 LiveKit（媒体走 UDP 端口段，host 网络最省事）：
+
+```bash
+sudo docker run -d --name livekit --restart unless-stopped \
+  --network host \
+  -v /etc/livekit.yaml:/etc/livekit.yaml:ro \
+  livekit/livekit-server:v1.13.11 --config /etc/livekit.yaml
+```
+
+> 不想用 Docker 就装 `livekit-server` 二进制（版本建议 ≥ v1.13）并执行 `livekit-server --config /etc/livekit.yaml`，配置同上。
+
+4）放行端口（云厂商安全组也要放行同样的规则）：
+
+```bash
+sudo ufw allow 7881/tcp
+sudo ufw allow 50000:50100/udp
+sudo ufw allow 3478/udp
+sudo ufw allow 3478/tcp
+# 7880 只给本机 Nginx 用，不要对公网放行
+```
+
+5）在 Nginx 站点的 `server { ... }` 里加 `/rtc` 反代（LiveKit 客户端会连 `wss://域名/rtc`）：
+
+```nginx
+location /rtc {
+    proxy_pass http://127.0.0.1:7880;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    proxy_buffering off;
+}
+```
+
+改完 `sudo nginx -t && sudo systemctl reload nginx`。
+
+6）把三个变量写进网关配置并重启：
+
+```bash
+sudo tee -a /etc/huixiang/env >/dev/null <<EOF
+LIVEKIT_URL=wss://$DOMAIN
+LIVEKIT_API_KEY=$LIVEKIT_API_KEY
+LIVEKIT_API_SECRET=$LIVEKIT_API_SECRET
+EOF
+sudo systemctl restart huixiang
+```
+
+`LIVEKIT_API_URL` 目前网关代码不读取，可留空（用 compose 时会填 `http://livekit:7880`，仅作占位）。
+
+**验收**：两个浏览器（或一个正常窗口 + 一个隐身窗口）登录同一服务器、进同一频道，A 点「共享屏幕 - 网页直播（LiveKit）」并确认弹窗，B 的成员行应出现「直播中」，点击能看到 A 的屏幕；两个人都开播时应显示「2 人直播」。
+
+#### 方式 B：整套 Docker Compose
+
+仓库 `deploy/docker-compose.sfu.yml` 会一起启动 LiveKit + 网关 + 可选 Caddy：
+
+```bash
+cd /opt/huixiang/deploy
+cp .env.sfu.example .env       # 填 DOMAIN / ACCESS_TOKEN / LIVEKIT_API_KEY / LIVEKIT_API_SECRET
+docker compose -f docker-compose.sfu.yml up -d --build
+# 需要 Caddy 自动签证书时再加 --profile tls
+```
+
+用这套时不要再启动本机的 `huixiang.service` 和宿主 Nginx（端口会冲突）；部署细节看 compose 文件顶部注释和 `deploy/Caddyfile.sfu`。
+
 ---
 
 ## 9. 跑自检脚本
@@ -284,7 +392,7 @@ cd /opt/huixiang/deploy
 bash verify.sh https://$DOMAIN "$ACCESS_TOKEN"
 ```
 
-**期望输出**：7 项全勾，最后一行 `通过 7 项，失败 0 项`，退出码 0。
+**期望输出**：所有检查项都是 `✓`，失败 0 项，退出码 0（成功条数会随版本略有增减，以「失败 0 项」为准）。
 
 它检查的是：
 
@@ -312,6 +420,7 @@ bash verify.sh https://$DOMAIN "$ACCESS_TOKEN"
 - [ ] 输入框打字回车能发出去，消息出现在聊天区
 - [ ] 点底部「麦克风」，浏览器弹权限请求，允许后按钮变成「麦克风已开」
 - [ ] 页头没有「这个浏览器不支持 WebCodecs」的黄色提示
+- [ ] （可选，部署了 LiveKit）点「共享屏幕 - 网页直播（LiveKit）」并确认，另一个浏览器能在成员行点「直播中」看到你的屏幕
 
 **最后一项**：让另一个人（或另一台设备）同时进服务器，验证能互相听到。
 
@@ -390,6 +499,10 @@ sudo systemctl restart huixiang
 | 所有人共用 1 个 IP 被限流（第 5 个人连不上） | Nginx 没传 `X-Forwarded-For` | 检查第 8 节的配置；确认反代和内网在同一台机器 |
 | 构建时 `OutOfMemoryError` | 内存不足 2 GB | 走附录 D，或者先加 swap：`sudo fallocate -l 2G /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile` |
 | `systemctl status` 显示 failed | 启动即崩 | `sudo journalctl -u huixiang -n 80 --no-pager`，最常见是端口被占（`ss -lntp \| grep 8080`） |
+| 「网页直播（LiveKit）」选项提示未启用 / 拿不到令牌 | 网关没配 `LIVEKIT_URL/API_KEY/SECRET` | 按第 8.1 节写入 `/etc/huixiang/env` 并 `systemctl restart huixiang` |
+| 网页直播一直「正在连接…」或观众黑屏 | `/rtc` 没反代，或 UDP 媒体端口没放行 | 检查 Nginx 的 `location /rtc`、云安全组/ufw 的 `50000:50100/udp`、`3478/udp`、`7881/tcp` |
+| 网页直播在手机上没声音 | iOS/Safari 限制自动播放 | 让用户先点一下画面解除静音；系统声在部分手机浏览器上拿不到，属浏览器限制 |
+| 多人同时直播时只显示一个人 | 老版本只支持单主播 | 升级到支持多主播的版本（网关与前端要同版本） |
 
 ---
 
@@ -406,6 +519,12 @@ sudo systemctl restart huixiang
 | `ALLOWED_ORIGINS` | 空 | 允许的页面来源，逗号分隔。留空只接受同源 |
 | `ACCOUNT_REMEMBER_DAYS` | `30` | myTeamSpeak 登录在浏览器里保留多少天（HttpOnly cookie，会话本身在网关内存）。设 `0` 关闭「记住登录」，每次刷新都要重新登录 |
 | `LOG_LEVEL` | `INFO` | 改成 `DEBUG` 会打印每条服务器命令，排障用，平时别开 |
+| `LIVEKIT_URL` | 空 | 浏览器连 LiveKit 的地址（如 `wss://example.com`，客户端会自动拼 `/rtc`）。留空则「网页直播」选项不可用 |
+| `LIVEKIT_API_URL` | 空 | 预留占位，当前网关代码不读取。compose 里填 `http://livekit:7880` 即可 |
+| `LIVEKIT_API_KEY` | 空 | LiveKit 的 API Key，必须与 LiveKit 配置里的 `keys` 一致 |
+| `LIVEKIT_API_SECRET` | 空 | LiveKit 的 API Secret |
+
+> **网页直播（LiveKit）是可选的独立服务**：它不随网关进程启动，需要单独跑 LiveKit 并做 `/rtc` 反向代理。仓库里 `deploy/docker-compose.sfu.yml` 是一份可直接参考的 Compose（LiveKit + 网关 + 可选 Caddy）。用现有 systemd 部署时，按 [第 8.1 节](#81-可选启用网页直播livekit) 单独加 LiveKit；至少要把 `LIVEKIT_URL`、`LIVEKIT_API_KEY`、`LIVEKIT_API_SECRET` 写进 `/etc/huixiang/env`，并让 Nginx 把 `/rtc` 转发到 LiveKit 的 7880。
 
 ---
 
@@ -430,6 +549,8 @@ sudo docker run -d --name huixiang \
 容器内必须 `HOST=0.0.0.0`（否则端口映射不进去），但 `-p` 绑在 `127.0.0.1` 上，外面照样只能经 Nginx。
 
 Nginx 部分和第 8 节完全一样。
+
+> 这个单容器命令只跑网关，**不含 LiveKit**，所以「网页直播」不可用。要连 LiveKit，在上面命令里再加 `-e LIVEKIT_URL=wss://$DOMAIN -e LIVEKIT_API_KEY=... -e LIVEKIT_API_SECRET=...`，并按第 8.1 节跑 LiveKit；或者直接用 `deploy/docker-compose.sfu.yml` 整套启动。
 
 ---
 
@@ -474,5 +595,6 @@ sudo apt install -y openjdk-21-jre-headless
 - 网关是一个 **UDP 代理**：谁能连上它，谁就能让这台服务器替他连任意 TS 服务器。`ACCESS_TOKEN` 是必须的。
 - `ALLOWED_ORIGINS` 挡得住别的网站，**挡不住 `curl`**；口令挡得住没有口令的人，**挡不住拿到口令的人**。要做到"每人独立账号、能封禁、能审计"，那是账号体系，不是加一个 token 的事。
 - 网页关掉连接就断，没有手机 App 那种后台保活。
+- **网页直播（LiveKit）只对网页成员生效**：原生 TeamSpeak 客户端不能观看；同一频道可多人同时开播，但每位主播都会各占一份上行和一份 SFU 出流，人多时要按带宽扩容。
 - 语音依赖浏览器 WebCodecs：Chrome/Edge 94+、Firefox 130+、Safari 26+（iOS 26+）。注意 Safari 16.4–18.x 的 WebCodecs 只有视频、没有音频，iOS 26 之前语音用不了；且 iOS 上所有浏览器都是 WebKit 内核，换 Chrome/Edge 也没用。低版本只能用文字和频道。
 - 单个连接是一个 UDP socket 加一个线程，网关限制全局 96 个、单 IP 4 个。要撑更多人得改架构，不是调参数能解决的。

@@ -64,6 +64,7 @@ import {
   type MicMode,
   type PersonDetails,
   type State,
+  type WebLivePublisher,
 } from '../protocol';
 import { avatarColor, avatarSources, initial } from '../ui';
 import { convertShortcodes, isEmojiOnly, EMOJI_LIST } from '../emoji';
@@ -170,8 +171,12 @@ interface Props {
   onToggleNotify?: () => void;
   /** 串流状态：自己在共享什么 / 正在看谁。 */
   stream?: StreamState;
+  /** 网页直播（LiveKit）里正在播的人，用来点亮成员行的「直播中」。 */
+  webLive?: WebLivePublisher[];
   /** 开始共享屏幕。 */
   onShareScreen?: () => void;
+  /** 用 LiveKit 发起网页直播（主播只上行一路，适合人多时）。 */
+  onShareLive?: () => void;
   /** 停止自己的共享。 */
   onStopShare?: () => void;
   /** 观看某个成员的直播。 */
@@ -428,7 +433,9 @@ export default function ServerHome(props: Props) {
     notifySupported = false,
     onToggleNotify,
     stream = initialStreamState,
+    webLive = [],
     onShareScreen,
+    onShareLive,
     onStopShare,
     onWatch,
     onStopWatch,
@@ -444,6 +451,10 @@ export default function ServerHome(props: Props) {
   const ownChannelNode = useMemo(() => findChannelSafe(state.tree, state.ownChannel), [state.tree, state.ownChannel]);
   const channelName = ownChannelNode ? ownChannelNode.display || ownChannelNode.name : '频道';
   const channelDesc = ownChannelNode ? cleanChannelDescription(ownChannelNode.description ?? '') : '';
+  // 当前频道里正在直播的人（原生 P2P 或网页直播），用于频道头显示多人同时直播
+  const liveInChannel = (ownChannelNode?.clients ?? []).filter(
+    (m) => m.streaming || webLive.some((p) => p.from === m.id),
+  );
 
   const [collapsed, setCollapsed] = useState<Set<number>>(() => new Set());
   const [searchOpen, setSearchOpen] = useState(false);
@@ -998,6 +1009,9 @@ export default function ServerHome(props: Props) {
             const chanPos = sibs.findIndex((c) => c.id === channel.id);
             const canMoveUp = chanPos > 0;
             const canMoveDown = chanPos >= 0 && chanPos < sibs.length - 1;
+            const liveMembers = channel.clients.filter(
+              (m) => m.streaming || webLive.some((p) => p.from === m.id),
+            );
             return (
               <div key={channel.id}>
                 <Button
@@ -1033,10 +1047,10 @@ export default function ServerHome(props: Props) {
                       <IconLock size="small" />
                     </span>
                   )}
-                  {channel.clients.some((m) => m.streaming) && (
+                  {liveMembers.length > 0 && (
                     <span className="sh-chan-live">
                       <span className="sh-live-dot" />
-                      直播中
+                      {liveMembers.length > 1 ? `${liveMembers.length} 人直播` : '直播中'}
                     </span>
                   )}
                   <Dropdown
@@ -1097,6 +1111,8 @@ export default function ServerHome(props: Props) {
                     const speaking =
                       !away &&
                       (m.talking || talkingIds.has(m.id) || (m.id === state.ownId && ownTalking));
+                    // 网页直播（LiveKit）不走 TS 的 streaming 字段，得单独看网关广播的名单
+                    const liveHere = m.streaming || webLive.some((p) => p.from === m.id);
                     return (
                     <Popover
                       key={m.id}
@@ -1120,7 +1136,7 @@ export default function ServerHome(props: Props) {
                         if (v && !personDetails?.[m.id]) onPerson?.(m.id);
                       }}
                     >
-                      <div className={`sh-member${speaking ? ' talking' : ''}${m.streaming ? ' is-live' : ''}`}>
+                      <div className={`sh-member${speaking ? ' talking' : ''}${liveHere ? ' is-live' : ''}`}>
                         <Avatar
                           id={m.id}
                           name={m.nickname}
@@ -1134,7 +1150,7 @@ export default function ServerHome(props: Props) {
                         <span className="sh-member-name" title={m.nickname}>
                           {m.nickname}
                         </span>
-                        {m.streaming ? (
+                        {liveHere ? (
                           <Button
                             htmlType="button"
                             className="sh-member-live btn-semi"
@@ -1485,6 +1501,9 @@ export default function ServerHome(props: Props) {
             </div>
             <div className="sh-chat-sub">
               {ownChannelNode ? ownChannelNode.clients.length : 0} 人在线
+              {liveInChannel.length > 0
+                ? ` · ${liveInChannel.length} 人正在直播（${liveInChannel.map((m) => m.nickname).join('、')}）`
+                : ''}
               {channelDesc ? ` · ${channelDesc}` : ''}
             </div>
           </div>
@@ -1493,11 +1512,19 @@ export default function ServerHome(props: Props) {
               trigger="click"
               position="bottomRight"
               menu={[
-                { node: 'item' as const, name: '共享屏幕 - WebRTC', onClick: () => onShareScreen?.() },
+                { node: 'item' as const, name: '共享屏幕 - WebRTC（点对点）', onClick: () => onShareScreen?.() },
                 {
                   node: 'item' as const,
-                  name: '共享屏幕 - 流媒体中继',
-                  onClick: () => Toast.info('流媒体中继功能正在开发中，敬请期待'),
+                  name: '共享屏幕 - 网页直播（LiveKit）',
+                  onClick: () => {
+                    Modal.confirm({
+                      title: '开启网页直播',
+                      content: '该功能仅限浏览器用户使用，原生 TeamSpeak 客户端无法观看。是否继续？',
+                      okText: '继续',
+                      cancelText: '取消',
+                      onOk: () => onShareLive?.(),
+                    });
+                  },
                 },
                 ...(stream.sharing !== null
                   ? [

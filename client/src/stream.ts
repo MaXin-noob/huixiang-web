@@ -4,6 +4,9 @@
 // 把「开播 / 要加入 / 停止」这些命令转给 TeamSpeak 服务器，转交双方的 SDP 和 ICE 地址，以及在 SDP
 // 上加几处 TeamSpeak 特有的修正（H.264 的 profile-level-id、session version、视频方向扩展）。
 // 这里因此只剩纯粹的 WebRTC。
+
+import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client';
+import type { LiveKitTokenResult } from './weblive';
 //
 // 共享是 mesh：每个观众一条 RTCPeerConnection，各发一份。两个人看就是两份上行，五个人就是五份——
 // 手机端也是这么做的，它简单、延迟低，代价是上行随人数线性增长。
@@ -145,6 +148,8 @@ export class StreamClient {
   private send: StreamSender;
   private onChange: (s: StreamState) => void;
   private log: (msg: string) => void;
+  private liveKitToken?: (publish: boolean) => Promise<LiveKitTokenResult>;
+  private liveKitPublishState?: (active: boolean) => void;
 
   /** 共享时：每个观众一条连接。 */
   private viewers = new Map<number, RTCPeerConnection>();
@@ -157,11 +162,25 @@ export class StreamClient {
   private remote: MediaStream | null = null;
   private watchTo = 0;
   private starting = false;
+  /** 网页直播（LiveKit）的房间；null 表示没在用这条链路。 */
+  private lkRoom: Room | null = null;
+  /** 这条链路上自己在干什么：推流、观看，或者没在用。 */
+  private lkMode: 'publish' | 'watch' | null = null;
 
-  constructor(opts: { send: StreamSender; onChange: (s: StreamState) => void; log?: (msg: string) => void }) {
+  constructor(opts: {
+    send: StreamSender;
+    onChange: (s: StreamState) => void;
+    log?: (msg: string) => void;
+    /** 向网关要一个 LiveKit 进房 token；publish=true 是主播。 */
+    liveKitToken?: (publish: boolean) => Promise<LiveKitTokenResult>;
+    /** 主播开始/停止推流时通知网关，好让同频道的人看到「直播中」。 */
+    liveKitPublishState?: (active: boolean) => void;
+  }) {
     this.send = opts.send;
     this.onChange = opts.onChange;
     this.log = opts.log ?? (() => {});
+    this.liveKitToken = opts.liveKitToken;
+    this.liveKitPublishState = opts.liveKitPublishState;
   }
 
   get snapshot(): StreamState {
@@ -211,8 +230,172 @@ export class StreamClient {
     this.send({ act: 'share', kind, name: kind === 2 ? '网页屏幕' : '网页摄像头', audio: withAudio });
   }
 
+  /**
+   * 网页直播：屏幕（+ 系统声音）推给 LiveKit，同频道的人订阅观看。
+   *
+   * 跟上面的 mesh 不同，主播只上行一条流，与观众人数无关；代价是媒体要经过 SFU，部署里得有 LiveKit。
+   * 采集失败、拿不到 token、进房失败都会清干净，不留下黑屏或僵尸 Track。
+   */
+  async startLiveKit() {
+    if (this.state.sharing || this.starting) return;
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      this.update({ error: '这个浏览器不支持直播屏幕，换 Chrome 或 Edge' });
+      return;
+    }
+    if (!this.liveKitToken) {
+      this.update({ error: '当前部署没有启用网页直播（LiveKit）' });
+      return;
+    }
+    this.starting = true;
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { max: 30 }, width: { max: 1920 }, height: { max: 1080 } },
+        audio: true,
+      });
+    } catch (e) {
+      this.starting = false;
+      const why = e instanceof Error ? e.message : String(e);
+      if (!/denied|cancel|NotAllowed/i.test(why)) this.update({ error: `打不开屏幕共享：${why}` });
+      return;
+    }
+    this.starting = false;
+    this.local = stream;
+    this.lkMode = 'publish';
+    for (const t of stream.getVideoTracks()) {
+      t.addEventListener('ended', () => this.stopShare());
+    }
+    this.update({ sharing: 2, live: false, viewers: 0, local: stream, error: null });
+
+    const res = await this.liveKitToken(true);
+    if (!res.ok || !res.url || !res.token) {
+      this.lkMode = null;
+      this.stopLocal();
+      this.update({ sharing: null, live: false, viewers: 0, local: null, error: res.error ?? '无法获取直播令牌' });
+      return;
+    }
+
+    const room = new Room({ adaptiveStream: true, dynacast: true });
+    this.lkRoom = room;
+    // 房间里可能还有别的主播；观众 identity 以 v 开头，主播以 p 开头，只数观众
+    const viewerCount = () =>
+      Array.from(room.remoteParticipants.values()).filter((p) => p.identity.startsWith('v')).length;
+    room.on(RoomEvent.ParticipantConnected, () => this.update({ viewers: viewerCount() }));
+    room.on(RoomEvent.ParticipantDisconnected, () => this.update({ viewers: viewerCount() }));
+    room.on(RoomEvent.Disconnected, () => {
+      if (this.lkMode === 'publish') this.update({ live: false });
+    });
+    try {
+      await room.connect(res.url, res.token);
+      const video = stream.getVideoTracks()[0];
+      if (video) {
+        await room.localParticipant.publishTrack(video, {
+          source: Track.Source.ScreenShare,
+          name: 'screen',
+        });
+      }
+      const audio = stream.getAudioTracks()[0];
+      if (audio) {
+        await room.localParticipant.publishTrack(audio, {
+          source: Track.Source.ScreenShareAudio,
+          name: 'screen-audio',
+        });
+      }
+      this.update({ live: true, error: null });
+      this.liveKitPublishState?.(true);
+    } catch (e) {
+      this.log(`livekit publish failed: ${e}`);
+      this.lkMode = null;
+      this.lkRoom = null;
+      void room.disconnect();
+      this.stopLocal();
+      this.update({
+        sharing: null,
+        live: false,
+        viewers: 0,
+        local: null,
+        error: `开始网页直播失败：${e instanceof Error ? e.message : String(e)}`,
+      });
+    }
+  }
+
+  /**
+   * 观看网页直播：进同一个房间，订阅主播的画面和系统声音。
+   *
+   * 房间名由网关按「服务器 + 频道」算，所以这里只需要知道在看谁（用于 UI），不需要对方给 stream id。
+   */
+  async watchLiveKit(streamer: number) {
+    if (streamer <= 0) return;
+    if (this.state.watching === streamer) return;
+    this.stopWatch(true);
+    this.watchTo = streamer;
+    this.lkMode = 'watch';
+    this.update({ watching: streamer, remote: null, remoteStatus: 'connecting', error: null });
+    if (!this.liveKitToken) {
+      this.failWatch('当前部署没有启用网页直播（LiveKit）');
+      return;
+    }
+    const res = await this.liveKitToken(false);
+    if (!res.ok || !res.url || !res.token) {
+      this.failWatch(res.error ?? '无法获取直播令牌');
+      return;
+    }
+    const room = new Room({ adaptiveStream: true, dynacast: true });
+    this.lkRoom = room;
+    // 同一房间可能有多位主播；主播 identity 形如 p<clientId>_<uid>，只订阅目标主播的轨道
+    const publisherPrefix = `p${streamer}_`;
+    const attach = (track: RemoteTrack) => {
+      if (!this.remote) this.remote = new MediaStream();
+      if (!this.remote.getTracks().some((t) => t.id === track.mediaStreamTrack.id)) {
+        this.remote.addTrack(track.mediaStreamTrack);
+      }
+      this.update({ remote: this.remote, remoteStatus: 'live' });
+    };
+    room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+      if (participant.identity.startsWith(publisherPrefix)) attach(track);
+    });
+    room.on(RoomEvent.Disconnected, () => {
+      if (this.lkMode === 'watch') this.update({ remoteStatus: 'failed' });
+    });
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      if (this.lkMode === 'watch' && participant.identity.startsWith(publisherPrefix)) {
+        this.update({ remoteStatus: 'failed' });
+      }
+    });
+    try {
+      await room.connect(res.url, res.token);
+      for (const participant of room.remoteParticipants.values()) {
+        if (!participant.identity.startsWith(publisherPrefix)) continue;
+        for (const publication of participant.trackPublications.values()) {
+          if (publication.track) attach(publication.track);
+        }
+      }
+    } catch (e) {
+      this.log(`livekit watch failed: ${e}`);
+      this.lkRoom = null;
+      void room.disconnect();
+      // 保留 lkMode='watch'，让 stopWatch 走 LiveKit 分支清理，不要误发一条 P2P 的 unwatch
+      this.failWatch(`直播打不开：${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  /** 当前正在观看的主播 clientId（0 表示没在看），供停止直播事件时自动收尾。 */
+  watchingClient(): number {
+    return this.state.watching;
+  }
+
   stopShare() {
     if (!this.state.sharing) return;
+    if (this.lkMode === 'publish') {
+      this.lkMode = null;
+      const room = this.lkRoom;
+      this.lkRoom = null;
+      if (room) void room.disconnect();
+      this.liveKitPublishState?.(false);
+      this.stopLocal();
+      this.update({ sharing: null, live: false, viewers: 0, local: null });
+      return;
+    }
     for (const pc of this.viewers.values()) pc.close();
     this.viewers.clear();
     this.stopLocal();
@@ -311,6 +494,16 @@ export class StreamClient {
    * 会收到 "already joined this stream"。
    */
   stopWatch(notify = true) {
+    if (this.lkMode === 'watch') {
+      this.lkMode = null;
+      const room = this.lkRoom;
+      this.lkRoom = null;
+      if (room) void room.disconnect();
+      this.watchTo = 0;
+      this.remote = null;
+      this.update({ watching: 0, remote: null, remoteStatus: 'idle' });
+      return;
+    }
     const was = this.state.watching > 0;
     this.watchTo = 0;
     this.watchPending.length = 0;
@@ -487,6 +680,9 @@ export class StreamClient {
       }
       this.watchPc = null;
     }
+    this.lkRoom?.disconnect();
+    this.lkRoom = null;
+    this.lkMode = null;
     this.stopLocal();
     this.watchPending.length = 0;
     this.remote = null;
