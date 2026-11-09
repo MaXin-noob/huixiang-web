@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Toast } from '@douyinfe/semi-ui';
 import { Gateway, tokenRequired } from './gateway';
+import { PingWindow, type PingSample } from './pingStats';
 import {
   accountNickname,
   DEFAULT_POKE_TEXT,
@@ -105,11 +106,15 @@ export default function App() {
   const [personDetails, setPersonDetails] = useState<Record<number, PersonDetails>>({});
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // 延迟拆成两段：浏览器↔网关、网关↔服务器（TeamSpeak 的 UDP ping）
-  const [ping, setPing] = useState<{ gateway: number | null; server: number | null }>({
+  // 延迟拆成两段：浏览器↔网关、网关↔服务器（TeamSpeak 的 UDP ping）。
+  // 每段都按「过去 5 秒的均值 ± 标准差」呈现，对齐 TeamSpeak 官方的 CONNECTION_PING / _DEVIATION。
+  const [ping, setPing] = useState<{ gateway: PingSample | null; server: PingSample | null }>({
     gateway: null,
     server: null,
   });
+  // 两段各一个 5 秒滑动窗口，把每秒的瞬时探针攒成均值与标准差。
+  const gwPingWindow = useRef(new PingWindow(5000));
+  const srvPingWindow = useRef(new PingWindow(5000));
   const [micOn, setMicOn] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
   const [audioReady, setAudioReady] = useState(false);
@@ -369,6 +374,7 @@ export default function App() {
             setWebLive([]);
             setPersonDetails({});
             setConnecting(false);
+            srvPingWindow.current.reset();
             setPing((p) => (p.server == null ? p : { ...p, server: null }));
             return;
           }
@@ -429,12 +435,19 @@ export default function App() {
             }
           } else {
             // 已经不在语音连接里了，服务器那半段延迟作废；网关那半段还活着
+            srvPingWindow.current.reset();
             setPing((p) => (p.server == null ? p : { ...p, server: null }));
           }
           if (s.error) setError(s.error);
         },
-        onRoundTrip: (ms) => setPing((p) => (p.gateway === ms ? p : { ...p, gateway: ms })),
-        onServerPing: (ms) => setPing((p) => (p.server === ms ? p : { ...p, server: ms })),
+        onRoundTrip: (ms) => {
+          const sample = gwPingWindow.current.add(ms);
+          setPing((p) => ({ ...p, gateway: sample }));
+        },
+        onServerPing: (ms) => {
+          const sample = srvPingWindow.current.add(ms);
+          setPing((p) => ({ ...p, server: sample }));
+        },
         onChat: (line) => {
           setChat((prev) => [...prev, line].slice(-MAX_CHAT));
           // 频道消息顺手落进本地库：以后进这个频道还能翻回来，哪怕当时不在这个频道
@@ -547,6 +560,8 @@ export default function App() {
           setChat([]);
           setFiles(null);
           setPersonDetails({});
+          gwPingWindow.current.reset();
+          srvPingWindow.current.reset();
           setPing({ gateway: null, server: null });
           setAccount(guestAccount());
           setBookmarks(emptyBookmarks());
@@ -605,6 +620,8 @@ export default function App() {
     setChat([]);
     setFiles(null);
     setPersonDetails({});
+    gwPingWindow.current.reset();
+    srvPingWindow.current.reset();
     setPing({ gateway: null, server: null });
     setConnecting(false);
   }, [talking]);
@@ -614,6 +631,8 @@ export default function App() {
       setError(null);
       setConnecting(true);
       talking.reset();
+      gwPingWindow.current.reset();
+      srvPingWindow.current.reset();
       setPing({ gateway: null, server: null });
       // 记住的是「用户自己的昵称」：登录时连进来用的是账号名，退出登录后重连还要回到自定义昵称
       const remembered = opts.nickname === store.nickname() ? opts.nickname : store.nickname() || opts.nickname;
