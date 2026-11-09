@@ -1243,9 +1243,28 @@
   margin-left: 8px;
   padding: 0;
   border: none;
+  border-radius: 0;
   background: none;
   color: var(--sh-brand-deep);
   font-size: 12.5px;
+  line-height: 1.2;
+  box-shadow: none;
+  outline: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* 复制是纯文字链式按钮：任何状态都不要 Semi 的底色/边框/焦点阴影 */
+.sh-copy,
+.sh-copy:hover,
+.sh-copy:active,
+.sh-copy:focus,
+.sh-copy:focus-visible {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: var(--sh-brand-deep) !important;
 }
 
 .sh-copy:hover {
