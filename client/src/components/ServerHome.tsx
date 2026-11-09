@@ -46,6 +46,7 @@ import {
   IconServer,
   IconPulse,
   IconFile,
+  IconShare,
 } from '@douyinfe/semi-icons';
 import StreamPanel from './StreamPanel';
 import { initialStreamState, type StreamState } from '../stream';
@@ -121,6 +122,8 @@ interface Props {
   onToggleInput: () => void;
   onToggleOutput: () => void;
   onDisconnect: () => void;
+  /** 生成服务器分享连接（加密后的 URL）；返回空串表示当前没有可分享的信息。 */
+  onShareLink?: () => Promise<string>;
   /** 说话方式：自动（检测到人声才发）/ 常开 / 按住说话，默认自动。 */
   micMode?: MicMode;
   onMicMode?: (mode: MicMode) => void;
@@ -408,6 +411,7 @@ export default function ServerHome(props: Props) {
     onSay,
     onToggleInput,
     onDisconnect,
+    onShareLink,
     micMode = 'auto',
     onMicMode,
     pttHeld = false,
@@ -474,6 +478,8 @@ export default function ServerHome(props: Props) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   // 设置页里的账号头像：隐藏的文件选择框、上传/删除进行中的标志（防重复点击）。
   const avatarFileRef = useRef<HTMLInputElement | null>(null);
@@ -951,6 +957,30 @@ export default function ServerHome(props: Props) {
     }
   };
 
+  const openShare = async () => {
+    if (!onShareLink) return;
+    try {
+      const url = await onShareLink();
+      if (!url) {
+        Toast.error('当前没有可分享的服务器信息');
+        return;
+      }
+      setShareUrl(url);
+      setShareOpen(true);
+    } catch {
+      Toast.error('生成分享连接失败');
+    }
+  };
+
+  const copyShare = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      Toast.success('分享连接已复制');
+    } catch {
+      Toast.error('复制失败');
+    }
+  };
+
   return (
     <div className="sh-shell" data-mobile-pane={mobilePane}>
       {/* ================= 左栏 ================= */}
@@ -965,6 +995,9 @@ export default function ServerHome(props: Props) {
                 {state.address}
               </div>
             </div>
+            <Button className="sh-share-btn btn-semi" htmlType="button" title="分享连接" onClick={() => void openShare()}>
+              <IconShare />
+            </Button>
             <Button className="sh-more-btn btn-semi" htmlType="button" title="更多" onClick={() => setMoreOpen((v) => !v)}>
               <IconMore />
             </Button>
@@ -1393,6 +1426,30 @@ export default function ServerHome(props: Props) {
             </AwayPopover>
           </div>
         </footer>
+
+        <Modal
+          title="分享连接"
+          visible={shareOpen}
+          onCancel={() => setShareOpen(false)}
+          width={520}
+          footer={
+            <div className="sh-share-foot">
+              <Button className="btn-semi" htmlType="button" onClick={() => setShareOpen(false)}>
+                关闭
+              </Button>
+              <Button className="btn-semi" htmlType="button" theme="solid" type="primary" onClick={() => void copyShare()}>
+                复制连接
+              </Button>
+            </div>
+          }
+        >
+          <div className="sh-share-body">
+            <p className="sh-share-tip">
+              把这条连接发给别人，对方打开后会自动以「匿名用户」身份进入本服务器；地址、服务器密码和网关口令都已加密，不会明文显示。
+            </p>
+            <Input className="sh-share-input" value={shareUrl} readOnly onFocus={(e) => e.currentTarget.select()} />
+          </div>
+        </Modal>
 
         {moreOpen && (
           <>
