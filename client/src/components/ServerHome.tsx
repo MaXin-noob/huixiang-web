@@ -49,6 +49,7 @@ import {
   findMember,
   flatten,
   memberKey,
+  POKE_TEXT_MAX,
   type AccountState,
   type ChannelCreate,
   type ChannelKind,
@@ -136,6 +137,9 @@ interface Props {
   onPerson?: (clientId: number) => void;
   /** 戳一戳某个成员（资料卡右上角按钮）。 */
   onPoke?: (clientId: number) => void;
+  /** 戳一戳时发送的自定义文案；空串则用默认的「戳了你一下」。 */
+  pokeText?: string;
+  onPokeText?: (v: string) => void;
   /** 成员个人音量（按 uid 记，0–2，0 = 单独静音）。 */
   volumes?: Record<string, number>;
   onMemberVolume?: (member: Member, v: number) => void;
@@ -412,6 +416,8 @@ export default function ServerHome(props: Props) {
     personDetails,
     onPerson,
     onPoke,
+    pokeText = '',
+    onPokeText,
     volumes,
     onMemberVolume,
     fileToken = '',
@@ -1477,6 +1483,24 @@ export default function ServerHome(props: Props) {
           {!notifySupported && (
             <div className="sh-set-hint">当前浏览器不支持桌面通知（需要 HTTPS 或 localhost 打开）。</div>
           )}
+
+          <div className="files-sub">戳一戳</div>
+          <div className="sh-set-row">
+            <div className="sh-set-row-text">
+              <div className="sh-set-label">戳一戳消息</div>
+              <div className="sh-set-desc">
+                别人被你戳时看到的内容；留空则显示默认的「戳了你一下」。
+              </div>
+            </div>
+          </div>
+          <Input
+            value={pokeText}
+            onChange={(v) => onPokeText?.(v)}
+            placeholder="戳了你一下"
+            maxLength={POKE_TEXT_MAX}
+            showClear
+            aria-label="戳一戳消息"
+          />
 
           <div className="files-sub">语音</div>
           <div className="sh-set-row">
