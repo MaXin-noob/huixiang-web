@@ -453,6 +453,11 @@
   background: var(--sh-speaking);
 }
 
+/* 直播中成员预留给说话绿点的位置：不说话时透明，保证「直播中」不因绿点出现而位移 */
+.sh-member-dot-idle {
+  opacity: 0;
+}
+
 /* 成员行右侧的「更多」入口（踢出频道 / 踢出服务器 / 封禁），平时淡出，悬停成员行才出现 */
 .sh-member-more {
   display: inline-flex;
@@ -1684,6 +1689,17 @@
   color: #ef4444;
   white-space: nowrap;
   cursor: pointer;
+}
+
+.sh-member-live,
+.sh-member-live:hover,
+.sh-member-live:active,
+.sh-member-live:focus,
+.sh-member-live:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
+  background: none !important;
+  border: none !important;
 }
 
 .sh-member-live:hover {
