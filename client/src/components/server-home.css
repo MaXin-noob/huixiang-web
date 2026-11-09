@@ -2013,7 +2013,7 @@
 .sh-form-inline .semi-slider-handle {
   width: 14px;
   height: 14px;
-  margin-top: 0;
+  margin-top: 9px;
   margin-left: -7px;
   background: var(--sh-brand);
   border: 2px solid #fff;
