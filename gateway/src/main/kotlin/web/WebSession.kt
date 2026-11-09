@@ -11,6 +11,7 @@ import tsproto.Json
 import tsproto.Pictures
 import tsproto.ServerModel
 import tsproto.TsClient
+import tsproto.MyTsVoiceIdentity
 import java.io.OutputStream
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
@@ -201,6 +202,8 @@ class WebSession(
 
     @Volatile private var client: TsClient? = null
     @Volatile private var ft: FileTransfer? = null
+    /** Exact MyTS proof supplied to the current voice connection; prevents stale account callbacks. */
+    @Volatile private var voiceIdentityForClient: MyTsVoiceIdentity? = null
 
     /** The downloaded ts3image banner, and its content type; null until it is in (or unless it is an https one). */
     @Volatile private var banner: ByteArray? = null
@@ -256,10 +259,12 @@ class WebSession(
         dirty.set(true)
         sink.text(Json.write(mapOf("t" to "identity", "v" to identity.export())))
 
+        val myTsIdentity = account.voiceIdentity()
         val c = TsClient(this) { log("$address: $it") }
         owned?.close()
         owned = c
         client = c
+        voiceIdentityForClient = myTsIdentity
         // 新连接新横幅：上一次的缓存作废，等 initserver 带来新地址再取
         ft = FileTransfer(c)
         lastBannerUrl = null
@@ -274,7 +279,7 @@ class WebSession(
                 defaultChannel = channel,
                 defaultChannelPassword = channelPassword,
                 // Signed in: prove the account to the server, so it can show the account's badges and signed avatar.
-                myTsIdentity = account.voiceIdentity(),
+                myTsIdentity = myTsIdentity,
             )
         )
     }
@@ -334,10 +339,12 @@ class WebSession(
     fun leave() {
         webLiveStop()
         val c = client ?: run {
+            voiceIdentityForClient = null
             serverKey = ""
             return
         }
         client = null
+        voiceIdentityForClient = null
         streams.reset()
         c.close()
         ft?.onDisconnected()
@@ -918,15 +925,37 @@ class WebSession(
     override fun onConnected(clientId: Int) {
         phase = Phase.CONNECTED
         error = null
+        val c = client
         // The groups (for their icons) and the rest of the server's own details; a refusal just leaves them out.
         listOf("servergrouplist", "channelgrouplist", "servergetvariables").forEachIndexed { i, cmd ->
-            client?.sendCommand(Commands.build(cmd, "return_code" to "quiet-$i"))
+            c?.sendCommand(Commands.build(cmd, "return_code" to "quiet-$i"))
         }
         syncMutes()
         dirty.set(true)
-        // Signed avatar, certificate and badges: optional, and only useful once the server accepted the proof.
-        val c = client
-        if (c != null) account.sendVoiceData { data -> if (client === c) c.sendMyTsData(data) }
+
+        // Both optional identity publications are fetched off the TeamSpeak thread. Capture the exact MyTS
+        // identity used in this connection so a delayed response can never publish a different account's data.
+        val myTsIdentity = voiceIdentityForClient
+        if (c != null && myTsIdentity != null) {
+            val isCurrentMyTsConnection = {
+                client === c &&
+                    c.state == TsClient.State.CONNECTED &&
+                    voiceIdentityForClient === myTsIdentity &&
+                    account.voiceIdentity() === myTsIdentity
+            }
+            account.sendVoiceData { data ->
+                if (isCurrentMyTsConnection()) c.sendMyTsData(data)
+            }
+            account.sendVoiceChatTag { payload ->
+                if (isCurrentMyTsConnection()) {
+                    c.sendMyTsChatTag(payload)
+                } else {
+                    log("$address: myTeamSpeak chat tag sync skipped (STALE_CONNECTION)")
+                }
+            }
+        } else {
+            log("$address: myTeamSpeak chat tag sync skipped (NO_VOICE_IDENTITY)")
+        }
     }
 
     override fun onCommand(cmd: Command) {
