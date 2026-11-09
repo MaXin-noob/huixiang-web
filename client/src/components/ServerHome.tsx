@@ -45,6 +45,7 @@ import {
   IconGlobe,
   IconServer,
   IconPulse,
+  IconFile,
 } from '@douyinfe/semi-icons';
 import StreamPanel from './StreamPanel';
 import { initialStreamState, type StreamState } from '../stream';
@@ -84,7 +85,7 @@ import ChannelIcon from './ChannelIcon';
 import FilesPanel from './FilesPanel';
 import FriendsPanel from './FriendsPanel';
 import ChatAttachment from './ChatAttachment';
-import { encodeAttachment, parseAttachment, type ChatAttachmentInfo } from '../chatAttach';
+import { encodeAttachment, parseAttachment, encodeChannelPicture, parseChannelPicture, parseMyTsFile, type ChatAttachmentInfo } from '../chatAttach';
 import { formatBytes, uploadFile } from '../files';
 import './server-home.css';
 
@@ -844,9 +845,15 @@ export default function ServerHome(props: Props) {
         size: file.size,
         kind,
       };
-      // 第一行给人看（别的 TS 客户端也能显示），第二行是本应用解析用的标记。
+      // 第一行给人看；图片用 TeamSpeak 官方频道图片 BBCode（官方客户端也能直接显示），
+      // 其它文件仍用本应用自己的 [[hf:]] 标记（官方看得到一行说明，但不会显示文件）。
       const label = kind === 'image' ? '🖼️' : '📎';
-      onSay(`${label} ${file.name}（${formatBytes(file.size)}）\n${encodeAttachment(att)}`);
+      const stored = path.split('/').filter(Boolean).pop() || safe;
+      const body =
+        kind === 'image'
+          ? `${label} ${file.name}（${formatBytes(file.size)}）\n${encodeChannelPicture(stored, state.ownChannel)}`
+          : `${label} ${file.name}（${formatBytes(file.size)}）\n${encodeAttachment(att)}`;
+      onSay(body);
     } catch (e: unknown) {
       Toast.error(`${file.name}：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -1744,8 +1751,30 @@ export default function ServerHome(props: Props) {
                       const line = message ? aiLineById.get(String(message.id)) : undefined;
                       if (!line) return defaultContent;
                       // 带附件标记的消息交给专门的组件渲染（图片给预览，文件给卡片）。
-                      const { att } = parseAttachment(line.text);
+                      // ①本应用的 [[hf:]] 标记；②TeamSpeak 官方频道图片 [img]ts3image://…[/img]。
+                      const hf = parseAttachment(line.text);
+                      const att = hf.att ?? parseChannelPicture(line.text).att;
                       if (att) return <ChatAttachment att={att} token={fileToken} />;
+                      // ③官方客户端经 myTeamSpeak 云发来的文件：至少显示成卡片，别让原始 JSON 露出来。
+                      const myts = parseMyTsFile(line.text);
+                      if (myts) {
+                        return (
+                          <div className="sh-attach-file sh-myts-file">
+                            <span className="sh-attach-ico">
+                              <IconFile size="large" />
+                            </span>
+                            <span className="sh-attach-info">
+                              <span className="sh-attach-name" title={myts.name}>
+                                {myts.name}
+                              </span>
+                              <span className="sh-attach-size">
+                                {formatBytes(myts.size)} · 来自 TeamSpeak 客户端
+                                {myts.isImage ? '（myTeamSpeak 云图片，暂不支持在网页预览）' : ''}
+                              </span>
+                            </span>
+                          </div>
+                        );
+                      }
                       const text = convertShortcodes(line.text);
                       // 纯表情消息（1~3 个 emoji）按大号渲染，其余沿用默认（Markdown）渲染。
                       if (isEmojiOnly(text)) {
