@@ -26,6 +26,14 @@ export interface Member {
   avatarName?: string;
   /** 对方公开的 myTeamSpeak 头像 https 地址；空表示没有。 */
   myTeamSpeakAvatar?: string;
+  /** 官方 MyTeamSpeak 用户标签（client_user_tag 里的 tag 文本）；空表示没有。 */
+  userTag?: string;
+  /** 公开资料（快照里就带的那些，资料卡未查到详情时兜底）。 */
+  description?: string;
+  country?: string;
+  platform?: string;
+  version?: string;
+  connectionTime?: number;
 }
 
 /**
@@ -45,6 +53,8 @@ export interface PersonDetails {
   version?: string;
   /** 连接时刻（Unix 秒）；0 或缺失表示服务器没给。 */
   connectionTime?: number;
+  /** 官方 MyTeamSpeak 用户标签（client_user_tag 里的 tag 文本）。 */
+  userTag?: string;
 }
 
 export interface ChannelNode {
