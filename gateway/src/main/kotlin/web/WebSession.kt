@@ -676,10 +676,9 @@ class WebSession(
             ?: return LiveKit.TokenResult(false, error = "还没有加入频道", status = 409)
         val own = model.ownClient
             ?: return LiveKit.TokenResult(false, error = "还没有加入频道", status = 409)
-        if (publish && LiveKit.list(room).any { it.clientId != own.id }) {
-            return LiveKit.TokenResult(false, error = "当前已有人在直播", status = 409)
-        }
-        val identity = "c${own.id}_${own.uid.ifBlank { own.id.toString() }}"
+        // identity 前缀区分角色：p 是主播、v 是观众，前端按 p<clientId>_ 只订阅某个人的画面
+        val role = if (publish) "p" else "v"
+        val identity = "$role${own.id}_${own.uid.ifBlank { own.id.toString() }}"
         return LiveKit.TokenResult(
             ok = true,
             url = LiveKitConfig.url,
@@ -692,8 +691,7 @@ class WebSession(
         if (!LiveKitConfig.enabled) return "网关没有配置 LiveKit"
         val room = liveRoomKey()?.takeIf { it.isNotEmpty() } ?: return "还没有加入频道"
         val own = model.ownClient ?: return "还没有加入频道"
-        val error = LiveKit.add(room, LiveKit.Publisher(own.id, own.nickname, own.uid))
-        if (error != null) return error
+        LiveKit.add(room, LiveKit.Publisher(own.id, own.nickname, own.uid))
         broadcastLive(room, mapOf("t" to "weblive", "event" to "started", "from" to own.id, "name" to own.nickname))
         return null
     }

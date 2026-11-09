@@ -451,6 +451,10 @@ export default function ServerHome(props: Props) {
   const ownChannelNode = useMemo(() => findChannelSafe(state.tree, state.ownChannel), [state.tree, state.ownChannel]);
   const channelName = ownChannelNode ? ownChannelNode.display || ownChannelNode.name : '频道';
   const channelDesc = ownChannelNode ? cleanChannelDescription(ownChannelNode.description ?? '') : '';
+  // 当前频道里正在直播的人（原生 P2P 或网页直播），用于频道头显示多人同时直播
+  const liveInChannel = (ownChannelNode?.clients ?? []).filter(
+    (m) => m.streaming || webLive.some((p) => p.from === m.id),
+  );
 
   const [collapsed, setCollapsed] = useState<Set<number>>(() => new Set());
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1005,6 +1009,9 @@ export default function ServerHome(props: Props) {
             const chanPos = sibs.findIndex((c) => c.id === channel.id);
             const canMoveUp = chanPos > 0;
             const canMoveDown = chanPos >= 0 && chanPos < sibs.length - 1;
+            const liveMembers = channel.clients.filter(
+              (m) => m.streaming || webLive.some((p) => p.from === m.id),
+            );
             return (
               <div key={channel.id}>
                 <Button
@@ -1040,11 +1047,10 @@ export default function ServerHome(props: Props) {
                       <IconLock size="small" />
                     </span>
                   )}
-                  {(channel.clients.some((m) => m.streaming) ||
-                    channel.clients.some((m) => webLive.some((p) => p.from === m.id))) && (
+                  {liveMembers.length > 0 && (
                     <span className="sh-chan-live">
                       <span className="sh-live-dot" />
-                      直播中
+                      {liveMembers.length > 1 ? `${liveMembers.length} 人直播` : '直播中'}
                     </span>
                   )}
                   <Dropdown
@@ -1495,6 +1501,9 @@ export default function ServerHome(props: Props) {
             </div>
             <div className="sh-chat-sub">
               {ownChannelNode ? ownChannelNode.clients.length : 0} 人在线
+              {liveInChannel.length > 0
+                ? ` · ${liveInChannel.length} 人正在直播（${liveInChannel.map((m) => m.nickname).join('、')}）`
+                : ''}
               {channelDesc ? ` · ${channelDesc}` : ''}
             </div>
           </div>

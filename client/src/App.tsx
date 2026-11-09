@@ -491,6 +491,10 @@ export default function App() {
         },
         onStream: (e) => streamRef.current?.onEvent(e),
         onWebLive: (e) => {
+          // 正在看的那个人下播了：自动收起画面，避免停在「连接失败」上
+          if (e.event === 'stopped' && streamRef.current?.watchingClient() === e.from) {
+            void streamRef.current?.stopWatch();
+          }
           setWebLive((prev) => {
             if (e.event === 'started') {
               const rest = prev.filter((p) => p.from !== e.from);

@@ -41,7 +41,7 @@ object LiveKit {
         val status: Int = 200,
     )
 
-    /** room -> (clientId -> publisher)。一个频道最多一个网页主播。 */
+    /** room -> (clientId -> publisher)。同一频道允许多人同时推流，各自一条。 */
     private val byRoom = ConcurrentHashMap<String, ConcurrentHashMap<Int, Publisher>>()
 
     /** 房间名只由服务器地址和频道 id 决定：换标签页、换主播都还是同一个房间。 */
@@ -53,12 +53,8 @@ object LiveKit {
 
     fun list(room: String): List<Publisher> = byRoom[room]?.values?.toList() ?: emptyList()
 
-    fun add(room: String, publisher: Publisher): String? {
-        val roomMap = byRoom.computeIfAbsent(room) { ConcurrentHashMap() }
-        val other = roomMap.values.firstOrNull { it.clientId != publisher.clientId }
-        if (other != null) return "当前已有人在直播"
-        roomMap[publisher.clientId] = publisher
-        return null
+    fun add(room: String, publisher: Publisher) {
+        byRoom.computeIfAbsent(room) { ConcurrentHashMap() }[publisher.clientId] = publisher
     }
 
     fun remove(room: String, clientId: Int): Publisher? {

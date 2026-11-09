@@ -277,8 +277,11 @@ export class StreamClient {
 
     const room = new Room({ adaptiveStream: true, dynacast: true });
     this.lkRoom = room;
-    room.on(RoomEvent.ParticipantConnected, () => this.update({ viewers: room.remoteParticipants.size }));
-    room.on(RoomEvent.ParticipantDisconnected, () => this.update({ viewers: room.remoteParticipants.size }));
+    // 房间里可能还有别的主播；观众 identity 以 v 开头，主播以 p 开头，只数观众
+    const viewerCount = () =>
+      Array.from(room.remoteParticipants.values()).filter((p) => p.identity.startsWith('v')).length;
+    room.on(RoomEvent.ParticipantConnected, () => this.update({ viewers: viewerCount() }));
+    room.on(RoomEvent.ParticipantDisconnected, () => this.update({ viewers: viewerCount() }));
     room.on(RoomEvent.Disconnected, () => {
       if (this.lkMode === 'publish') this.update({ live: false });
     });
@@ -339,6 +342,8 @@ export class StreamClient {
     }
     const room = new Room({ adaptiveStream: true, dynacast: true });
     this.lkRoom = room;
+    // 同一房间可能有多位主播；主播 identity 形如 p<clientId>_<uid>，只订阅目标主播的轨道
+    const publisherPrefix = `p${streamer}_`;
     const attach = (track: RemoteTrack) => {
       if (!this.remote) this.remote = new MediaStream();
       if (!this.remote.getTracks().some((t) => t.id === track.mediaStreamTrack.id)) {
@@ -346,16 +351,21 @@ export class StreamClient {
       }
       this.update({ remote: this.remote, remoteStatus: 'live' });
     };
-    room.on(RoomEvent.TrackSubscribed, (track) => attach(track));
+    room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+      if (participant.identity.startsWith(publisherPrefix)) attach(track);
+    });
     room.on(RoomEvent.Disconnected, () => {
       if (this.lkMode === 'watch') this.update({ remoteStatus: 'failed' });
     });
-    room.on(RoomEvent.ParticipantDisconnected, () => {
-      if (this.lkMode === 'watch' && room.remoteParticipants.size === 0) this.update({ remoteStatus: 'failed' });
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      if (this.lkMode === 'watch' && participant.identity.startsWith(publisherPrefix)) {
+        this.update({ remoteStatus: 'failed' });
+      }
     });
     try {
       await room.connect(res.url, res.token);
       for (const participant of room.remoteParticipants.values()) {
+        if (!participant.identity.startsWith(publisherPrefix)) continue;
         for (const publication of participant.trackPublications.values()) {
           if (publication.track) attach(publication.track);
         }
@@ -367,6 +377,11 @@ export class StreamClient {
       // 保留 lkMode='watch'，让 stopWatch 走 LiveKit 分支清理，不要误发一条 P2P 的 unwatch
       this.failWatch(`直播打不开：${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+
+  /** 当前正在观看的主播 clientId（0 表示没在看），供停止直播事件时自动收尾。 */
+  watchingClient(): number {
+    return this.state.watching;
   }
 
   stopShare() {
