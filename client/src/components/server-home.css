@@ -1506,6 +1506,26 @@
   flex: 1;
 }
 
+/* 设置页：每个设置项之间加分割线 */
+.sh-settings .files-sub {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--semi-color-border);
+}
+
+.sh-settings .files-sub:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* 资料卡：昵称与头像之间也加一条 */
+.sh-settings .sh-avatar-row {
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--semi-color-border);
+}
+
 /* 设置页 · 个人资料（账号头像上传 / 更换 / 删除） */
 .sh-avatar-row {
   display: flex;
