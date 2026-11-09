@@ -119,6 +119,8 @@ interface Props {
   talkingIds: ReadonlySet<number>;
   onJoinChannel: (cid: number, password?: string) => void;
   onSay: (text: string) => void;
+  /** 修改自己的服务器昵称（clientupdate client_nickname）。 */
+  onRename?: (name: string) => void;
   onToggleInput: () => void;
   onToggleOutput: () => void;
   onDisconnect: () => void;
@@ -409,6 +411,7 @@ export default function ServerHome(props: Props) {
     talkingIds,
     onJoinChannel,
     onSay,
+    onRename,
     onToggleInput,
     onDisconnect,
     onShareLink,
@@ -481,6 +484,9 @@ export default function ServerHome(props: Props) {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState('');
+  /** TeamSpeak 昵称上限 30 个字符。 */
+  const NICKNAME_MAX = 30;
   // 设置页里的账号头像：隐藏的文件选择框、上传/删除进行中的标志（防重复点击）。
   const avatarFileRef = useRef<HTMLInputElement | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -916,6 +922,20 @@ export default function ServerHome(props: Props) {
   const banner = info?.bannerUrl ?? null;
 
   const ownMember = findMember(state.tree, state.ownId);
+
+  // 设置页打开时把当前昵称带进输入框；保存后发给网关改服务器昵称。
+  const openSettings = () => {
+    setNicknameDraft(ownMember?.nickname ?? state.nickname ?? '');
+    setSettingsOpen(true);
+  };
+  const saveNickname = () => {
+    const name = nicknameDraft.trim();
+    if (!name) return Toast.warning('昵称不能为空');
+    if (name.length > NICKNAME_MAX) return Toast.warning(`昵称最多 ${NICKNAME_MAX} 个字符`);
+    if (name === (ownMember?.nickname ?? state.nickname ?? '')) return;
+    onRename?.(name);
+    Toast.success('已提交名称修改');
+  };
 
   // 设置页「个人资料」：点头像区的按钮触发隐藏的 file input；选中图片后交给上层压图上传。
   const pickAvatar = () => avatarFileRef.current?.click();
@@ -1546,6 +1566,34 @@ export default function ServerHome(props: Props) {
       >
         <div className="files-body">
           <div className="files-sub">个人资料</div>
+          <div className="sh-set-row">
+            <div className="sh-set-row-text">
+              <div className="sh-set-label">昵称</div>
+              <div className="sh-set-desc">修改后在服务器和所有客户端（含官方客户端）都会同步显示。</div>
+            </div>
+          </div>
+          <div className="sh-nick-row">
+            <Input
+              value={nicknameDraft}
+              onChange={(v) => setNicknameDraft(v)}
+              placeholder="输入新的昵称"
+              maxLength={NICKNAME_MAX}
+              showClear
+              aria-label="昵称"
+              onEnterPress={saveNickname}
+            />
+            <Button
+              theme="solid"
+              type="primary"
+              disabled={
+                !nicknameDraft.trim() ||
+                nicknameDraft.trim() === (ownMember?.nickname ?? state.nickname ?? '')
+              }
+              onClick={saveNickname}
+            >
+              保存
+            </Button>
+          </div>
           <div className="sh-avatar-row">
             <Avatar
               id={state.ownId}
@@ -1736,7 +1784,7 @@ export default function ServerHome(props: Props) {
               htmlType="button"
               title="设置"
               aria-pressed={settingsOpen}
-              onClick={() => setSettingsOpen((v) => !v)}
+              onClick={() => (settingsOpen ? setSettingsOpen(false) : openSettings())}
             >
               <IconSetting />
             </Button>

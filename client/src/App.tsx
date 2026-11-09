@@ -861,6 +861,14 @@ export default function App() {
     gatewayRef.current?.say(text, s.ownChannel, clientId);
   }, []);
 
+  /** 修改自己的服务器昵称；本地记住新名字，服务器更新后经 state 推回。 */
+  const rename = useCallback((name: string) => {
+    const n = name.trim();
+    if (!n) return;
+    store.setNickname(n);
+    gatewayRef.current?.rename(n);
+  }, []);
+
   // 开关通知。打开时要走浏览器的权限申请（必须在点击里），拒绝/不支持都给出明确说法。
   const toggleNotify = useCallback(async () => {
     if (notifyOn) {
@@ -1175,6 +1183,7 @@ export default function App() {
         onPttHold={setPttHeld}
         onJoinChannel={joinChannel}
         onSay={say}
+        onRename={rename}
         onPrivately={sayTo}
         onListFiles={listFiles}
         onMicGain={changeMicGain}
@@ -1244,6 +1253,7 @@ export default function App() {
     loadMoreHistory,
     say,
     sayTo,
+    rename,
     listFiles,
     changeMicGain,
     changeOutputGain,

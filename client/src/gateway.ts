@@ -327,6 +327,11 @@ export class Gateway {
     this.send({ t: 'away', away, message });
   }
 
+  /** 修改自己的服务器昵称（clientupdate client_nickname），结果经 state 推回。 */
+  rename(name: string) {
+    this.send({ t: 'rename', name });
+  }
+
   // ====== 频道管理：建 / 删 / 改 / 踢 / 封（结果从 onChanOp 回来） ======
 
   createChannel(patch: ChannelCreate) {

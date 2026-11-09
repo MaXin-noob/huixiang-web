@@ -1494,6 +1494,18 @@
   color: #d97706;
 }
 
+/* 设置页 · 昵称修改 */
+.sh-nick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.sh-nick-row .semi-input-wrapper {
+  flex: 1;
+}
+
 /* 设置页 · 个人资料（账号头像上传 / 更换 / 删除） */
 .sh-avatar-row {
   display: flex;

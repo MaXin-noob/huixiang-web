@@ -73,9 +73,6 @@ export default function UserCard({
   const pct = Math.round(Math.min(2, Math.max(0, volume)) * 100);
   const userTag = parseUserTag(details?.userTag || member.userTag);
   const country = (details?.country || member.country || '').trim();
-  const clientLabel = [(details?.platform || member.platform || '').trim(), (details?.version || member.version || '').trim()]
-    .filter(Boolean)
-    .join(' ');
   const onlineFor = formatOnlineDuration(details?.connectionTime || member.connectionTime);
   const description = (details?.description || member.description || '').trim();
 
@@ -150,12 +147,6 @@ export default function UserCard({
           <div className="uc-row">
             <dt>地区</dt>
             <dd>{country}</dd>
-          </div>
-        )}
-        {clientLabel && (
-          <div className="uc-row">
-            <dt>客户端</dt>
-            <dd>{clientLabel}</dd>
           </div>
         )}
         {onlineFor && (
