@@ -567,15 +567,42 @@ export default function ServerHome(props: Props) {
     );
   }, [flat, q]);
 
-  // 新消息自动滚到底（AIChatDialogue 内部自己滚动）
+  // 新消息自动滚到底。AIChatDialogue 会在内容完成二次布局之前就滚动：
+  // 最后一条消息的标题行、气泡高度稍后才补上，导致底部露出一截、被输入框挡住，
+  // 必须手动滚一下才能看全。这里在挂载/新消息后先强制贴底，再在随后的几帧、
+  // 短延时以及滚动容器/内容尺寸变化时继续补滚，等异步布局稳定后仍精确贴底。
   useEffect(() => {
-    const el = dlgRef.current?.containerRef.current;
-    if (el) {
-      dlgRef.current?.scrollToBottom(false);
-      return;
+    const scroller = () => dlgRef.current?.containerRef.current ?? listRef.current ?? null;
+    // force=false 时只在用户原本就贴着底部（<48px）时才跟随，避免用户手动往回翻时被拽回底部。
+    const pin = (force: boolean) => {
+      const el = scroller();
+      if (!el) return;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+      if (force || nearBottom) el.scrollTop = el.scrollHeight;
+    };
+    pin(true);
+    const timers = [0, 30, 80, 160, 320, 600].map((d) => window.setTimeout(() => pin(true), d));
+    // 用 rAF 连续贴底约 400ms，覆盖 Semi 内部二次布局与图片异步撑高的时序。
+    let raf = 0;
+    const start = performance.now();
+    const tick = () => {
+      pin(true);
+      if (performance.now() - start < 400) raf = window.requestAnimationFrame(tick);
+    };
+    raf = window.requestAnimationFrame(tick);
+    // 内容高度晚到时（图片加载完、字体替换）若仍贴底就继续跟随。
+    let ro: ResizeObserver | undefined;
+    const el = scroller();
+    if (el && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => pin(false));
+      ro.observe(el);
+      if (el.firstElementChild) ro.observe(el.firstElementChild);
     }
-    const fallback = listRef.current;
-    if (fallback) fallback.scrollTop = fallback.scrollHeight;
+    return () => {
+      timers.forEach((t) => window.clearTimeout(t));
+      if (raf) window.cancelAnimationFrame(raf);
+      ro?.disconnect();
+    };
   }, [chat.length]);
 
   // AIChatDialogue 的列表滚动到顶部时继续加载更早的消息
