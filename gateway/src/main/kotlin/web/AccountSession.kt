@@ -29,9 +29,9 @@ import java.util.concurrent.TimeoutException
  * in an HttpOnly cookie; [RememberedAccounts] keeps the session itself until the cookie is forgotten, so a reload
  * can [resume] it without the password ever being stored — and a stolen browser profile still cannot read a token.
  *
- * All account RPCs (login, bookmarks, contacts, profile) run on one thread. They block on HTTPS for up to half a
- * minute, and none of that may happen on Netty's event loop. Contact display-name lookups and the optional voice
- * metadata are public-read only and use a small side pool, so one slow Matrix profile cannot hold up a login.
+ * Login, bookmarks, contacts and profile RPCs run on one account worker. They block on HTTPS for up to half
+ * a minute, and none of that may happen on Netty's event loop. Contact display-name lookups, optional voice metadata
+ * and the signed voice user-tag lookup use a small side pool, so slow auxiliary requests cannot hold up a login.
  */
 class AccountSession(
     private val push: (String) -> Unit,
