@@ -109,6 +109,46 @@
   background: rgba(107, 124, 52, 0.12);
 }
 
+.sh-share-btn {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--sh-olive);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.sh-share-btn:hover {
+  background: rgba(107, 124, 52, 0.12);
+}
+
+.sh-share-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sh-share-tip {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--semi-color-text-2);
+}
+
+.sh-share-input {
+  font-family: var(--semi-font-family-regular);
+}
+
+.sh-share-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .sh-server-status {
   display: flex;
   align-items: center;
@@ -2133,6 +2173,12 @@
 
   /* 移动端触控目标：底部栏、搜索、区块“+”、频道操作都放大到手指可点 */
   .sh-more-btn {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .sh-share-btn {
     flex: 0 0 32px;
     width: 32px;
     height: 32px;

@@ -37,6 +37,7 @@ import { clampGain, DEFAULT_GAIN } from './audio/gain';
 import { TalkingTracker } from './talking';
 import { StreamClient, initialStreamState, type StreamState } from './stream';
 import { fetchLiveKitToken, reportLivePublishing } from './weblive';
+import { buildShareUrl, decodeShare, encodeShare } from './shareLink';
 import { notifyPermission, notifySupported, requestNotifyPermission, showMessageNotice } from './notify';
 import { playJoinCue, playLeaveCue } from './audio/cues';
 import { diffPresence, type PresenceBaseline } from './presence';
@@ -174,6 +175,13 @@ export default function App() {
   const micRef = useRef<MicSender | null>(null);
   const streamRef = useRef<StreamClient | null>(null);
   const lastAddress = useRef<{ address: string; nickname: string; guest?: boolean } | null>(null);
+  // 最近一次连接用的凭据，用来生成「分享连接」（只在内存里，不落盘）
+  const lastCreds = useRef<{ host: string; port: number; password: string; token: string }>({
+    host: '',
+    port: 9987,
+    password: '',
+    token: '',
+  });
   // 回调里要读最新状态，不能靠闭包
   const stateRef = useRef<State | null>(null);
 
@@ -628,6 +636,7 @@ export default function App() {
 
   const doConnect = useCallback(
     async (opts: ConnectOptions, useToken: string) => {
+      lastCreds.current = { host: opts.host, port: opts.port, password: opts.password ?? '', token: useToken };
       setError(null);
       setConnecting(true);
       talking.reset();
@@ -688,6 +697,57 @@ export default function App() {
       tokenNeeded ? token : '',
     );
   }, [account, doConnect, token, tokenNeeded]);
+
+  // 生成分享连接：把当前连接的地址/端口/服务器密码/网关口令加密进 #join=
+  const makeShareLink = useCallback(async (): Promise<string> => {
+    const c = lastCreds.current;
+    if (!c.host) return '';
+    const token = await encodeShare({
+      h: c.host,
+      p: c.port,
+      pw: c.password || undefined,
+      t: c.token || undefined,
+      v: 1,
+    });
+    return buildShareUrl(token);
+  }, []);
+
+  // 打开分享连接时（URL 带 #join=）自动以「匿名用户」身份进服，无需手动填地址/口令
+  const inviteHandled = useRef(false);
+  useEffect(() => {
+    if (!tokenChecked || inviteHandled.current) return;
+    const m = window.location.hash.match(/^#join=(.+)$/);
+    if (!m) return;
+    inviteHandled.current = true;
+    void (async () => {
+      const payload = await decodeShare(m[1]);
+      if (!payload) {
+        setError('分享连接无效或已损坏');
+        return;
+      }
+      if (tokenNeeded) {
+        if (!payload.t) {
+          setError('分享连接缺少网关口令，无法进入');
+          return;
+        }
+        store.setToken(payload.t);
+        setToken(payload.t);
+      }
+      // 用掉就把 hash 去掉，避免刷新重复触发
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      void doConnect(
+        {
+          host: payload.h,
+          port: payload.p,
+          nickname: '匿名用户',
+          password: payload.pw ?? '',
+          identity: store.identity(),
+          guest: true,
+        },
+        tokenNeeded ? payload.t ?? '' : '',
+      );
+    })();
+  }, [tokenChecked, tokenNeeded, doConnect]);
 
   const accountLogin = useCallback(
     async (email: string, password: string, otp: string) => {
@@ -1123,6 +1183,7 @@ export default function App() {
         onToggleInput={toggleInput}
         onToggleOutput={toggleOutput}
         onDisconnect={disconnect}
+        onShareLink={makeShareLink}
         onReconnect={reconnectSame}
         onShareScreen={shareScreen}
         onShareLive={shareLive}
@@ -1190,6 +1251,7 @@ export default function App() {
     toggleInput,
     toggleOutput,
     disconnect,
+    makeShareLink,
     reconnectSame,
     shareScreen,
     shareLive,
