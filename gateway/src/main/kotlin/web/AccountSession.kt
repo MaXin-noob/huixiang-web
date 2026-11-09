@@ -4,6 +4,7 @@ import tsproto.CloudFailure
 import tsproto.Json
 import tsproto.MyTsAccount
 import tsproto.MyTsBookmarks
+import tsproto.MyTsChatTag
 import tsproto.MyTsProfile
 import tsproto.MyTsVoiceData
 import tsproto.MyTsVoiceIdentity
@@ -316,6 +317,40 @@ class AccountSession(
             }
         } catch (_: RejectedExecutionException) {
             // The tab closed while the connection was being made.
+        }
+    }
+
+    /**
+     * Fetch the official signed public chat identifier after the voice connection accepted this account proof.
+     * The RPCs can block on HTTPS, so they run on the side pool rather than the TeamSpeak or Netty thread.
+     * Only the tag payload is passed to the caller; chat credentials and session tokens never leave this class.
+     */
+    fun sendVoiceChatTag(use: (MyTsChatTag.Payload) -> Unit) {
+        val current = session ?: return
+        if (closed) return
+        try {
+            sidePool.execute {
+                if (closed || session !== current) return@execute
+                try {
+                    val matrixId = MyTsAccount().chatCredentials(current).userId
+                    val payload = MyTsChatTag().readPayload(current, matrixId)
+                    if (closed || session !== current) return@execute
+                    if (payload == null) {
+                        log("voice chat tag unavailable (MYTS_TAG_NO_PRIMARY_IDENTIFIER)")
+                        return@execute
+                    }
+                    use(payload)
+                } catch (e: CloudFailure) {
+                    if (!closed && session === current) {
+                        val code = e.code.takeIf { it.matches(Regex("[A-Z0-9_]{1,64}")) } ?: "UNEXPECTED"
+                        log("voice chat tag unavailable ($code)")
+                    }
+                } catch (_: Exception) {
+                    if (!closed && session === current) log("voice chat tag unavailable (UNEXPECTED)")
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            // The tab closed while the signed identifier was being fetched.
         }
     }
 
