@@ -1564,7 +1564,7 @@ export default function ServerHome(props: Props) {
         placement="right"
         className="files-sheet"
       >
-        <div className="files-body">
+        <div className="files-body sh-settings">
           <div className="files-sub">个人资料</div>
           <div className="sh-set-row">
             <div className="sh-set-row-text">
