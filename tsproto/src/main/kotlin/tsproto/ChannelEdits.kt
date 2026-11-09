@@ -20,6 +20,7 @@ object ChannelEdits {
         val maxClients: Int = -1, // -1 = unlimited
         val parent: Int = 0,
         val after: Int = 0, // the channel it comes after (0 = first): a new one's place, or a moved one's in its new parent
+        val iconId: Long = 0, // the channel icon file: /icon_<id> in the server's files (0 = none)
     )
 
     /** A command to send: its name and parameters. */
@@ -35,6 +36,7 @@ object ChannelEdits {
     fun settingsOf(ch: ServerModel.Channel) = Settings(
         name = ch.name, description = ch.description, kind = kindOf(ch), password = ch.hasPassword,
         codec = ch.codec, quality = ch.codecQuality, maxClients = ch.maxClients, parent = ch.parent, after = ch.order,
+        iconId = ch.iconId,
     )
 
     fun create(s: Settings) = Edit(
@@ -47,6 +49,7 @@ object ChannelEdits {
             "channel_codec" to s.codec,
             "channel_codec_quality" to s.quality,
             "channel_password" to s.newPassword.takeIf { s.password && it.isNotEmpty() }?.let { Crypto.hashPassword(it) },
+            "channel_icon_id" to s.iconId.takeIf { it > 0 },
         ) + flags(s.kind) + maxClients(s.maxClients),
     )
 
@@ -67,6 +70,7 @@ object ChannelEdits {
         if (s.codec != ch.codec) p += "channel_codec" to s.codec
         if (s.quality != ch.codecQuality) p += "channel_codec_quality" to s.quality
         if (s.maxClients != ch.maxClients) p += maxClients(s.maxClients)
+        if (s.iconId != ch.iconId) p += "channel_icon_id" to s.iconId
         if (p.isNotEmpty()) out += Edit("channeledit", listOf("cid" to ch.id) + p)
         // Into another parent: first there (a channelmove can't stay in the same parent)
         if (s.parent != ch.parent) out += Edit("channelmove", listOf("cid" to ch.id, "cpid" to s.parent, "order" to s.after))

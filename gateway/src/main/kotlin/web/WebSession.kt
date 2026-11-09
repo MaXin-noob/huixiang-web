@@ -509,6 +509,7 @@ class WebSession(
         maxClients: Int?,
         parent: Int?,
         after: Int?,
+        iconId: Long?,
     ) {
         val c = client ?: return
         // 读 model 必须在连接自己的线程上（ServerModel 不是线程安全的）
@@ -526,6 +527,7 @@ class WebSession(
                 maxClients = maxClients ?: cur.maxClients,
                 parent = parent ?: cur.parent,
                 after = after ?: cur.after,
+                iconId = iconId ?: cur.iconId,
             )
             val edits = ChannelEdits.edit(ch, s).toMutableList()
             // edit() 只在换父级时才带 order；同一父级下的排序要单独发一次 channel_order。
