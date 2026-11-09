@@ -478,6 +478,12 @@
   color: var(--sh-text-1);
 }
 
+/* 自己那行的占位：只占位、不显示、不可点，让说话绿点和别人处于同一水平位置 */
+.sh-member-more-ghost {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
 @media (hover: none) {
   .sh-member-more {
     opacity: 1;
