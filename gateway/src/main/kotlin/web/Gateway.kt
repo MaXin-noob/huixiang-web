@@ -328,7 +328,15 @@ fun Application.gateway(dist: File, access: Access, history: ChannelHistory) {
             if (data == null) {
                 call.respond(HttpStatusCode.NotFound, "no banner")
             } else {
-                call.respondBytes(data.first, io.ktor.http.ContentType.parse(data.second))
+                // 横幅字节按会话缓存；用内容哈希做 ETag，并允许浏览器缓存一小时，避免每次刷新重下。
+                val etag = "\"${data.first.contentHashCode().toUInt().toString(16)}\""
+                call.response.header("Cache-Control", "private, max-age=3600")
+                call.response.header("ETag", etag)
+                if (call.request.headers["If-None-Match"] == etag) {
+                    call.respond(HttpStatusCode.NotModified)
+                } else {
+                    call.respondBytes(data.first, io.ktor.http.ContentType.parse(data.second))
+                }
             }
         }
 

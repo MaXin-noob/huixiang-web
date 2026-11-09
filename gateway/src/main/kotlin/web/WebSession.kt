@@ -1293,7 +1293,8 @@ class WebSession(
         // https 的浏览器自己加载；ts3image 的走本会话下载好的字节，还没到就先不给
         val bannerUrl = when {
             gfx.startsWith("https://", ignoreCase = true) -> gfx
-            banner != null -> "/server-banner/$bannerId"
+            // 地址里带上内容的版本号：同一张横幅在不同会话/刷新之间是同一个地址，浏览器才能命中缓存。
+            banner != null -> "/server-banner/$bannerId?v=${banner.contentHashCode().toUInt().toString(16)}"
             else -> null
         }
         return linkedMapOf(
