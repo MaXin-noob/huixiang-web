@@ -2529,3 +2529,57 @@
   object-fit: cover;
   border-radius: 6px;
 }
+
+/* 服务器事件面板：左侧色条 + 事件文案 + 时间 */
+.sh-events {
+  padding: 4px 2px;
+}
+.sh-events-empty {
+  color: var(--semi-color-text-2);
+  font-size: 13px;
+  padding: 28px 10px;
+  text-align: center;
+  line-height: 1.7;
+}
+.sh-ev-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--semi-color-border);
+  font-size: 13px;
+}
+.sh-ev-row:last-child {
+  border-bottom: none;
+}
+.sh-ev-bar {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--semi-color-text-3);
+  flex: 0 0 auto;
+}
+.sh-ev-row.is-enter .sh-ev-bar {
+  background: var(--semi-color-success);
+}
+.sh-ev-row.is-leave .sh-ev-bar {
+  background: var(--semi-color-danger);
+}
+.sh-ev-row.is-move .sh-ev-bar {
+  background: var(--semi-color-warning, #f0a020);
+}
+.sh-ev-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--semi-color-text-0);
+  word-break: break-word;
+}
+.sh-ev-text b {
+  font-weight: 600;
+}
+.sh-ev-time {
+  flex: 0 0 auto;
+  color: var(--semi-color-text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}

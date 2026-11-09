@@ -641,3 +641,16 @@ export function findChannel(tree: ChannelNode[], id: number): ChannelNode | null
   }
   return null;
 }
+
+/** 一条服务器事件：谁进来了、走了、或切换了频道。 */
+export interface ServerEvent {
+  ev: 'enter' | 'leave' | 'move';
+  name: string;
+  channel?: string;
+  from?: string;
+  to?: string;
+  reason?: number;
+  reasonMsg?: string;
+  invoker?: string;
+  time: number;
+}

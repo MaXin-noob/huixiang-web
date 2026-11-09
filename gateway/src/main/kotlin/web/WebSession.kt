@@ -120,6 +120,10 @@ class WebSession(
     private val model = ServerModel()
     /** Channels whose description we've already asked for (the plain channellist doesn't carry it). */
     private val descRequested = HashSet<Int>()
+
+    /** 最近的服务器事件（进入 / 离开 / 切换频道），最多保留 100 条，供「服务器事件」面板补历史。 */
+    private val recentEvents = ArrayDeque<Map<String, Any>>()
+    private var ownEnterLogged = false
     private val pushTimer = Executors.newSingleThreadScheduledExecutor { r ->
         Thread(r, "web-push").apply { isDaemon = true }
     }
@@ -413,6 +417,41 @@ class WebSession(
         if (name.isBlank()) return
         nickname = name
         c.sendCommand(Commands.build("clientupdate", "client_nickname" to name))
+    }
+
+    /** 页面打开「服务器事件」面板时，补一份本会话已经看到的事件（实时事件另外单独推送）。 */
+    fun requestServerEvents() {
+        sink.text(Json.write(mapOf("t" to "serverEvents", "items" to recentEvents.toList())))
+    }
+
+    private fun channelLabel(id: Int): String = model.channels[id]?.name ?: if (id > 0) "#$id" else ""
+
+    /** 记一条服务器事件并实时推给页面；[recentEvents] 保留最近 100 条给面板补历史。 */
+    private fun pushServerEvent(
+        ev: String,
+        name: String,
+        channel: String = "",
+        from: String = "",
+        to: String = "",
+        reason: Int = 0,
+        reasonMsg: String = "",
+        invoker: String = "",
+    ) {
+        val item = linkedMapOf<String, Any>(
+            "t" to "serverEvent",
+            "ev" to ev,
+            "name" to name,
+            "channel" to channel,
+            "from" to from,
+            "to" to to,
+            "reason" to reason,
+            "reasonMsg" to reasonMsg,
+            "invoker" to invoker,
+            "time" to System.currentTimeMillis(),
+        )
+        recentEvents.addLast(item)
+        while (recentEvents.size > 100) recentEvents.removeFirst()
+        sink.text(Json.write(item))
     }
 
     /**
@@ -965,9 +1004,61 @@ class WebSession(
         // 文件传输的应答也走这条命令流，先让 FileTransfer 挑走它的，剩下的才进模型
         ft?.onCommand(cmd)
         when (cmd.name) {
+            // 服务器事件：记录谁进来 / 离开 / 切换频道（在 model.apply 之前读，才能拿到移动前的旧频道）。
+            "notifycliententerview" -> for (g in cmd.groups) {
+                if (g["client_type"] == "1") continue
+                val id = g["clid"]?.toIntOrNull() ?: continue
+                val ctid = g["ctid"]?.toIntOrNull() ?: continue
+                val cfid = g["cfid"]?.toIntOrNull() ?: 0
+                if (cfid > 0) continue // 换频道由 notifyclientleftview 记成 move，避免重复
+                val who = g["client_nickname"] ?: model.clients[id]?.nickname ?: "Client $id"
+                pushServerEvent("enter", who, channel = channelLabel(ctid))
+            }
+            "notifyclientmoved" -> for (g in cmd.groups) {
+                if (g["client_type"] == "1") continue
+                val id = g["clid"]?.toIntOrNull() ?: continue
+                val to = g["ctid"]?.toIntOrNull() ?: continue
+                val who = if (id == model.ownClientId) nickname
+                else (model.clients[id]?.nickname ?: g["client_nickname"] ?: "Client $id")
+                val fromCh = model.clients[id]?.channel ?: 0
+                pushServerEvent(
+                    "move", who,
+                    from = channelLabel(fromCh), to = channelLabel(to),
+                    reason = g["reasonid"]?.toIntOrNull() ?: 0, invoker = g["invokername"] ?: "",
+                )
+            }
+            "notifyclientleftview" -> for (g in cmd.groups) {
+                if (g["client_type"] == "1") continue
+                val id = g["clid"]?.toIntOrNull() ?: continue
+                val target = g["ctid"]?.toIntOrNull() ?: 0
+                val reason = g["reasonid"]?.toIntOrNull() ?: 0
+                val who = if (id == model.ownClientId) nickname
+                else (model.clients[id]?.nickname ?: g["client_nickname"] ?: "Client $id")
+                val invoker = g["invokername"] ?: ""
+                if (target > 0 && reason in listOf(0, 1, 4)) {
+                    val fromCh = model.clients[id]?.channel ?: 0
+                    pushServerEvent(
+                        "move", who,
+                        from = channelLabel(fromCh), to = channelLabel(target),
+                        reason = reason, invoker = invoker,
+                    )
+                } else {
+                    pushServerEvent(
+                        "leave", who,
+                        reason = reason, reasonMsg = g["reasonmsg"] ?: "", invoker = invoker,
+                    )
+                }
+            }
             // Everyone on the server, not only the people in our own channel.
             "channellistfinished" -> {
                 client?.sendCommand("channelsubscribeall")
+                if (!ownEnterLogged && model.ownClientId > 0) {
+                    val ch = model.clients[model.ownClientId]?.channel ?: 0
+                    if (ch > 0) {
+                        ownEnterLogged = true
+                        pushServerEvent("enter", nickname, channel = channelLabel(ch))
+                    }
+                }
                 // The server's plain channellist carries no channel_description, so ask for each channel's
                 // description once; it comes back as notifychanneledited and the model stores it.
                 for (ch in model.channels.values) {

@@ -28,6 +28,7 @@ import {
   type Member,
   type MicMode,
   type PersonDetails,
+  type ServerEvent,
   type State,
   type WebLivePublisher,
 } from './protocol';
@@ -105,6 +106,8 @@ export default function App() {
   const [cloudNotice, setCloudNotice] = useState<string | null>(null);
   // 用户资料卡的补充字段：按 clientId 缓存；服务器没给就只显示快照里已有的。
   const [personDetails, setPersonDetails] = useState<Record<number, PersonDetails>>({});
+  /** 服务器事件面板：本会话收到的进出/切换事件（最多留 200 条）。 */
+  const [serverEvents, setServerEvents] = useState<ServerEvent[]>([]);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 延迟拆成两段：浏览器↔网关、网关↔服务器（TeamSpeak 的 UDP ping）。
@@ -537,6 +540,9 @@ export default function App() {
           else Toast.error(`${r.label}失败：${r.error ?? '未知错误'}`);
         },
         onPerson: (p) => setPersonDetails((prev) => ({ ...prev, [p.id]: p })),
+        // 服务器事件：实时追加；打开面板时网关会补一份本会话历史，直接替换。
+        onServerEvents: (items) => setServerEvents(items.slice(-200)),
+        onServerEvent: (e) => setServerEvents((prev) => [...prev, e].slice(-200)),
         // 有人戳了戳我：弹一条提示；页面不在前台时再补一条桌面通知（跟聊天消息同一套开关）。
         onPoke: (p) => {
           const me = stateRef.current?.ownId ?? 0;
@@ -1106,7 +1112,8 @@ export default function App() {
   );
   // 资料卡：向服务器补问某人的公开字段（答案从 onPerson 回来并缓存）
   const requestPerson = useCallback((clientId: number) => gatewayRef.current?.requestPerson(clientId), []);
-
+  // 服务器事件面板：打开时向网关要一份本会话的历史事件
+  const requestServerEvents = useCallback(() => gatewayRef.current?.requestServerEvents(), []);
   /** 戳一戳某个成员；成功/失败由网关的 onChanOp 回执弹提示。 */
   const poke = useCallback(
     (clientId: number) => gatewayRef.current?.poke(clientId, pokeText.trim()),
@@ -1207,6 +1214,8 @@ export default function App() {
         onBanMember={banMember}
         personDetails={personDetails}
         onPerson={requestPerson}
+        serverEvents={serverEvents}
+        onRequestEvents={requestServerEvents}
         onPoke={poke}
         pokeText={pokeText}
         onPokeText={setPokeText}
@@ -1286,6 +1295,8 @@ export default function App() {
     banMember,
     personDetails,
     requestPerson,
+    serverEvents,
+    requestServerEvents,
     poke,
     pokeText,
     setPokeText,
