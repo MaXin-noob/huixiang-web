@@ -2507,3 +2507,25 @@
 .sh-attach-dl {
   flex: 0 0 auto;
 }
+
+/* 频道头像设置：图标预览 + 选择/移除按钮 */
+.sh-chan-icon-edit {
+  gap: 8px;
+}
+.sh-chan-icon-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--semi-color-fill-0);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.sh-chan-icon-preview img {
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 6px;
+}

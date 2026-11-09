@@ -896,6 +896,7 @@ private fun onChannel(session: WebSession, m: Map<*, *>) {
             maxClients = (m["maxClients"] as? Number)?.toInt(),
             parent = (m["parent"] as? Number)?.toInt(),
             after = (m["after"] as? Number)?.toInt(),
+            iconId = (m["iconId"] as? Number)?.toLong(),
         )
         "delete" -> session.deleteChannel((m["cid"] as? Number)?.toInt() ?: return)
         "kick" -> session.kickClient(

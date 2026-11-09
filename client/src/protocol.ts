@@ -172,6 +172,8 @@ export interface ChannelPatch {
   maxClients?: number;
   parent?: number;
   after?: number;
+  /** 频道图标 id：0 清除；1000+ 指向服务器文件 /icon_<id>。 */
+  iconId?: number;
 }
 
 /** 一次频道管理操作（建/删/改/踢/封）的结果，label 与 error 都是中文。 */

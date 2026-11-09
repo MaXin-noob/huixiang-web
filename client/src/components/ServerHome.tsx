@@ -88,6 +88,7 @@ import FriendsPanel from './FriendsPanel';
 import ChatAttachment from './ChatAttachment';
 import { encodeAttachment, parseAttachment, encodeChannelPicture, parseChannelPicture, parseMyTsFile, type ChatAttachmentInfo } from '../chatAttach';
 import { formatBytes, uploadFile } from '../files';
+import { makeChannelIconPng } from '../iconImage';
 import './server-home.css';
 
 /** AIChatDialogue 的角色元数据：聊天记录里所有成员都按 user 角色渲染。 */
@@ -494,6 +495,8 @@ export default function ServerHome(props: Props) {
   const [pwValue, setPwValue] = useState('');
   // 频道管理：新建/编辑表单、删除确认、行内「更多」菜单。
   const [chanDialog, setChanDialog] = useState<{ mode: 'create' | 'edit'; target: ChannelNode | null } | null>(null);
+  const [chanIconBusy, setChanIconBusy] = useState(false);
+  const chanIconInput = useRef<HTMLInputElement | null>(null);
   const [chanForm, setChanForm] = useState<ChanForm>(() => defaultChanForm());
   const [deleteTarget, setDeleteTarget] = useState<ChannelNode | null>(null);
   const [chanMenuId, setChanMenuId] = useState<number | null>(null);
@@ -722,8 +725,39 @@ export default function ServerHome(props: Props) {
       codec: ch.codec ?? 4,
       quality: ch.quality ?? 6,
       maxClients: ch.maxClients ?? -1,
+      iconId: ch.iconId ?? 0,
     });
     setChanDialog({ mode: 'edit', target: ch });
+  };
+
+  const pickChanIcon = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      Toast.warning('请选择图片文件');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      Toast.warning('图片太大，请选 20 MB 以内的图片');
+      return;
+    }
+    if (!fileToken) {
+      Toast.error('文件传输还没准备好，请稍后再试');
+      return;
+    }
+    setChanIconBusy(true);
+    try {
+      const blob = await makeChannelIconPng(file);
+      // 图标 id 由客户端给出，取 1000 以上的随机值，指向服务器文件 /icon_<id>
+      const id = 1000 + Math.floor(Math.random() * 0x7fffffff);
+      const path = `/icon_${id}`;
+      const named = new File([blob], `icon_${id}.png`, { type: 'image/png' });
+      await uploadFile({ token: fileToken, cid: 0, path, file: named, overwrite: true });
+      setChanForm((f) => ({ ...f, iconId: id }));
+      Toast.success('频道头像已上传，保存后生效');
+    } catch (e) {
+      Toast.error(e instanceof Error ? e.message : '频道头像上传失败');
+    } finally {
+      setChanIconBusy(false);
+    }
   };
 
   const submitChannel = () => {
@@ -764,6 +798,7 @@ export default function ServerHome(props: Props) {
     if (chanForm.codec !== target.codec) patch.codec = chanForm.codec;
     if (chanForm.quality !== (target.quality ?? 6)) patch.quality = chanForm.quality;
     if (chanForm.maxClients !== target.maxClients) patch.maxClients = chanForm.maxClients;
+    if (chanForm.iconId !== (target.iconId ?? 0)) patch.iconId = chanForm.iconId;
     if (Object.keys(patch).length === 0) {
       Toast.info('频道没有改动');
       setChanDialog(null);
@@ -2028,6 +2063,36 @@ export default function ServerHome(props: Props) {
                 />
               </label>
 
+              {chanDialog.mode === 'edit' && (
+                <div className="sh-form-row">
+                  <span className="sh-form-label">头像</span>
+                  <div className="sh-form-inline sh-chan-icon-edit">
+                    <span className="sh-chan-icon-preview">
+                      <ChannelIcon iconId={chanForm.iconId} token={state.avatarToken ?? ''} />
+                    </span>
+                    <Button size="small" loading={chanIconBusy} onClick={() => chanIconInput.current?.click()}>
+                      选择图片
+                    </Button>
+                    {chanForm.iconId > 0 && (
+                      <Button size="small" type="tertiary" onClick={() => setChanForm((f) => ({ ...f, iconId: 0 }))}>
+                        移除
+                      </Button>
+                    )}
+                    <input
+                      ref={chanIconInput}
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        const picked = e.target.files?.[0];
+                        e.target.value = '';
+                        if (picked) void pickChanIcon(picked);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <label className="sh-form-row">
                 <span className="sh-form-label">描述</span>
                 <TextArea
@@ -2335,6 +2400,7 @@ type ChanForm = {
   codec: number;
   quality: number;
   maxClients: number;
+  iconId: number;
 };
 
 function defaultChanForm(): ChanForm {
@@ -2348,6 +2414,7 @@ function defaultChanForm(): ChanForm {
     codec: 4,
     quality: 6,
     maxClients: -1,
+    iconId: 0,
   };
 }
 
