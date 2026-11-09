@@ -1206,6 +1206,7 @@ export default function ServerHome(props: Props) {
                       content={
                         <UserCard
                           member={m}
+                          live={liveHere}
                           channelName={channel.display || channel.name}
                           ownId={state.ownId}
                           accountAvatar={account.avatarUrl}
@@ -1724,7 +1725,7 @@ export default function ServerHome(props: Props) {
                           avatarToken={avatarToken}
                           accountAvatar={account.avatarUrl}
                           size={40}
-                          live={!!findMember(state.tree, line.from)?.streaming}
+                          live={!!findMember(state.tree, line.from)?.streaming || webLive.some((p) => p.from === line.from)}
                         />
                       );
                     },

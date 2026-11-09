@@ -17,6 +17,11 @@ interface Props {
   onVolume?: (v: number) => void;
   /** 戳一戳这个人（右上角按钮）；不传则不显示，自己的卡片也不显示。 */
   onPoke?: () => void;
+  /**
+   * 是否正在直播。传入时以此为准，缺省回退到 member.streaming。
+   * 因为网页直播（LiveKit）不走 TS 的 streaming 字段，需由外部把网关广播的名单合并进来。
+   */
+  live?: boolean;
 }
 
 /**
@@ -32,8 +37,10 @@ export default function UserCard({
   volume = 1,
   onVolume,
   onPoke,
+  live,
 }: Props) {
   const me = member.id === ownId;
+  const isLive = live ?? member.streaming;
   const groups = [member.channelGroup, ...member.serverGroups].filter((g) => !!g && g.trim().length > 0);
   const pct = Math.round(Math.min(2, Math.max(0, volume)) * 100);
 
@@ -45,7 +52,7 @@ export default function UserCard({
           sources={avatarSources(member, ownId, accountAvatar, avatarToken)}
           colorKey={me ? 'me' : member.uid || member.id}
           className="user-card-avatar"
-          live={member.streaming}
+          live={isLive}
           size={52}
         />
         <div className="user-card-ident">
@@ -59,7 +66,7 @@ export default function UserCard({
             ) : (
               <span className="uc-badge uc-online">在线</span>
             )}
-            {member.streaming && <span className="uc-badge uc-live">直播中</span>}
+            {isLive && <span className="uc-badge uc-live">直播中</span>}
             {member.inputMuted && <span className="uc-badge uc-mute">麦克风静音</span>}
             {!member.inputMuted && member.outputMuted && <span className="uc-badge uc-mute">扬声器静音</span>}
             {member.priority && <span className="uc-badge uc-priority">优先发言人</span>}
