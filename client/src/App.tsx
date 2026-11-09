@@ -1031,8 +1031,8 @@ export default function App() {
 
   const setAwayMessage = useCallback((message: string) => {
     const s = stateRef.current;
-    if (!s?.away) return;
-    gatewayRef.current?.setAway(true, message);
+    // 未暂离时也可先保存离开消息：服务器会存下 client_away_message，之后暂离生效。
+    gatewayRef.current?.setAway(s?.away ?? false, message);
   }, []);
 
   const toggleInput = useCallback(async () => {

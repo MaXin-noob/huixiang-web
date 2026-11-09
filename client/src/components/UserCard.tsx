@@ -72,6 +72,7 @@ export default function UserCard({
   const groups = [member.channelGroup, ...member.serverGroups].filter((g) => !!g && g.trim().length > 0);
   const pct = Math.round(Math.min(2, Math.max(0, volume)) * 100);
   const userTag = parseUserTag(details?.userTag || member.userTag);
+  const awayMessage = (member.awayMessage || '').trim();
   const country = (details?.country || member.country || '').trim();
   const onlineFor = formatOnlineDuration(details?.connectionTime || member.connectionTime);
   const description = (details?.description || member.description || '').trim();
@@ -94,7 +95,9 @@ export default function UserCard({
           </div>
           <div className="user-card-badges">
             {member.away ? (
-              <span className="uc-badge uc-away">离开</span>
+              <span className="uc-badge uc-away" title={awayMessage || undefined}>
+                离开
+              </span>
             ) : (
               <span className="uc-badge uc-online">在线</span>
             )}
@@ -141,6 +144,12 @@ export default function UserCard({
                 </span>
               ))}
             </dd>
+          </div>
+        )}
+        {member.away && awayMessage && (
+          <div className="uc-row">
+            <dt>离开消息</dt>
+            <dd className="uc-desc">{awayMessage}</dd>
           </div>
         )}
         {country && (
