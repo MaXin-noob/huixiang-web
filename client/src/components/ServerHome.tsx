@@ -567,15 +567,23 @@ export default function ServerHome(props: Props) {
     );
   }, [flat, q]);
 
-  // 新消息自动滚到底（AIChatDialogue 内部自己滚动）
+  // 新消息自动滚到底。AIChatDialogue 会在内容完成二次布局之前就滚动：
+  // 最后一条消息的标题行等高度稍后才补上，导致底部露出一截、被输入框挡住，
+  // 必须手动下滑才能看全。这里在挂载/新消息后立即滚一次，并在随后的几帧与
+  // 短延时里再补滚几次，等异步布局稳定后仍精确贴底。
   useEffect(() => {
-    const el = dlgRef.current?.containerRef.current;
-    if (el) {
-      dlgRef.current?.scrollToBottom(false);
-      return;
-    }
-    const fallback = listRef.current;
-    if (fallback) fallback.scrollTop = fallback.scrollHeight;
+    const pin = () => {
+      const el = dlgRef.current?.containerRef.current;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+        return;
+      }
+      const fallback = listRef.current;
+      if (fallback) fallback.scrollTop = fallback.scrollHeight;
+    };
+    pin();
+    const timers = [0, 30, 80, 160, 320].map((delay) => window.setTimeout(pin, delay));
+    return () => timers.forEach((t) => window.clearTimeout(t));
   }, [chat.length]);
 
   // AIChatDialogue 的列表滚动到顶部时继续加载更早的消息
