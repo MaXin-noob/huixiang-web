@@ -20,7 +20,9 @@ object ChannelEdits {
         val maxClients: Int = -1, // -1 = unlimited
         val parent: Int = 0,
         val after: Int = 0, // the channel it comes after (0 = first): a new one's place, or a moved one's in its new parent
-        val iconId: Long = 0, // the channel icon file: /icon_<id> in the server's files (0 = none)
+        // Channel icon. On TeamSpeak 6 this is the channel permission `i_icon_id` (the value points at the
+        // `/icon_<id>` file in the server's files); `channel_icon_id` is read-only and `channeledit` rejects it.
+        val iconId: Long = 0,
     )
 
     /** A command to send: its name and parameters. */
@@ -49,7 +51,6 @@ object ChannelEdits {
             "channel_codec" to s.codec,
             "channel_codec_quality" to s.quality,
             "channel_password" to s.newPassword.takeIf { s.password && it.isNotEmpty() }?.let { Crypto.hashPassword(it) },
-            "channel_icon_id" to s.iconId.takeIf { it > 0 },
         ) + flags(s.kind) + maxClients(s.maxClients),
     )
 
@@ -70,8 +71,15 @@ object ChannelEdits {
         if (s.codec != ch.codec) p += "channel_codec" to s.codec
         if (s.quality != ch.codecQuality) p += "channel_codec_quality" to s.quality
         if (s.maxClients != ch.maxClients) p += maxClients(s.maxClients)
-        if (s.iconId != ch.iconId) p += "channel_icon_id" to s.iconId
         if (p.isNotEmpty()) out += Edit("channeledit", listOf("cid" to ch.id) + p)
+        // 频道图标在 TS6 里是权限 i_icon_id，不是 channeledit 的参数（发 channel_icon_id 会回 invalid parameter）。
+        if (s.iconId != ch.iconId) {
+            out += if (s.iconId > 0) {
+                Edit("channeladdperm", listOf("cid" to ch.id, "permsid" to "i_icon_id", "permvalue" to s.iconId))
+            } else {
+                Edit("channeldelperm", listOf("cid" to ch.id, "permsid" to "i_icon_id"))
+            }
+        }
         // Into another parent: first there (a channelmove can't stay in the same parent)
         if (s.parent != ch.parent) out += Edit("channelmove", listOf("cid" to ch.id, "cpid" to s.parent, "order" to s.after))
         return out

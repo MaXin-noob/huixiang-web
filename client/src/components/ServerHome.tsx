@@ -756,8 +756,9 @@ export default function ServerHome(props: Props) {
     setChanIconBusy(true);
     try {
       const blob = await makeChannelIconPng(file);
-      // 图标 id 由客户端给出，取 1000 以上的随机值，指向服务器文件 /icon_<id>
-      const id = 1000 + Math.floor(Math.random() * 0x7fffffff);
+      // 图标 id 由客户端给出，取 1000 以上的随机值，指向服务器文件 /icon_<id>。
+      // 控制在 2^31 以内，避免超出 TS 的 int 范围导致权限值/图标 id 出错。
+      const id = 1000 + Math.floor(Math.random() * 2_000_000_000);
       const path = `/icon_${id}`;
       const named = new File([blob], `icon_${id}.png`, { type: 'image/png' });
       await uploadFile({ token: fileToken, cid: 0, path, file: named, overwrite: true });
@@ -1362,7 +1363,13 @@ export default function ServerHome(props: Props) {
                           </Button>
                         ) : null}
                         {m.away ? <span className="sh-member-away">离开</span> : null}
-                        {speaking ? <span className="sh-member-dot" /> : null}
+                        {liveHere ? (
+                          // 直播中成员始终渲染一个固定宽度的绿点位（不说话时透明），
+                          // 避免说话时绿点出现把「直播中」文字挤走。
+                          <span className={`sh-member-dot${speaking ? '' : ' sh-member-dot-idle'}`} />
+                        ) : speaking ? (
+                          <span className="sh-member-dot" />
+                        ) : null}
                         {m.id === state.ownId && (
                           // 自己那行没有「成员管理」按钮，补一个同宽的占位，保证说话绿点和别人对齐
                           <span className="sh-member-more sh-member-more-ghost" aria-hidden="true" />
