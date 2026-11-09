@@ -853,6 +853,8 @@ private fun onText(session: WebSession, text: String, ip: String) {
         }
         "away" -> session.setAway(m["away"] == true, (m["message"] as? String).orEmpty())
         "person" -> session.personDetails((m["clid"] as? Number)?.toInt() ?: return)
+        // 「服务器事件」面板：把本会话最近的进出/切换事件补一份。
+        "events" -> session.requestServerEvents()
         // 戳一戳：给某个在线成员发一条 clientpoke，结果以 chanOp 回页面（成功/失败提示）。
         "poke" -> session.poke((m["clid"] as? Number)?.toInt() ?: return, (m["msg"] as? String).orEmpty())
         "channel" -> onChannel(session, m)

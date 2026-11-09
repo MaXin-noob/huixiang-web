@@ -15,6 +15,7 @@ import type {
   HistoryMessage,
   PersonDetails,
   PokeMessage,
+  ServerEvent,
   State,
   WebLiveEvent,
 } from './protocol';
@@ -63,6 +64,10 @@ export interface GatewayHandlers {
   onPerson?: (person: PersonDetails) => void;
   /** 有人戳了戳我。 */
   onPoke?: (poke: PokeMessage) => void;
+  /** 服务器事件面板：一份本次会话已经看到的事件（打开面板时补历史）。 */
+  onServerEvents?: (items: ServerEvent[]) => void;
+  /** 一条实时的服务器事件（进/出/切换频道）。 */
+  onServerEvent?: (event: ServerEvent) => void;
   /** 服务端关了连接：1008 多半是口令不对或来源不被允许。 */
   onClose?: (code: number, reason: string) => void;
   onError?: (message: string) => void;
@@ -212,6 +217,12 @@ export class Gateway {
           case 'person':
             this.handlers.onPerson?.(m as unknown as PersonDetails);
             break;
+          case 'serverEvents':
+            this.handlers.onServerEvents?.((m.items as ServerEvent[]) ?? []);
+            break;
+          case 'serverEvent':
+            this.handlers.onServerEvent?.(m as unknown as ServerEvent);
+            break;
           case 'poke':
             this.handlers.onPoke?.(m as unknown as PokeMessage);
             break;
@@ -311,6 +322,11 @@ export class Gateway {
   /** 要某人的资料卡补充字段（服务器公开的那部分）；答案从 `onPerson` 回来。 */
   requestPerson(clid: number) {
     this.send({ t: 'person', clid });
+  }
+
+  /** 要本会话最近的服务器事件；答案从 `onServerEvents` 回来。 */
+  requestServerEvents() {
+    this.send({ t: 'events' });
   }
 
   /** 戳一戳某个在线成员（结果从 onChanOp 回来）。 */

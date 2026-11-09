@@ -47,6 +47,7 @@ import {
   IconPulse,
   IconFile,
   IconShare,
+  IconHistory,
 } from '@douyinfe/semi-icons';
 import StreamPanel from './StreamPanel';
 import { initialStreamState, type StreamState } from '../stream';
@@ -73,6 +74,7 @@ import {
   type Member,
   type MicMode,
   type PersonDetails,
+  type ServerEvent,
   type State,
   type WebLivePublisher,
 } from '../protocol';
@@ -127,6 +129,10 @@ interface Props {
   onDisconnect: () => void;
   /** 生成服务器分享连接（加密后的 URL）；返回空串表示当前没有可分享的信息。 */
   onShareLink?: () => Promise<string>;
+  /** 本会话的服务器事件（进/出/切换频道）。 */
+  serverEvents?: ServerEvent[];
+  /** 打开「服务器事件」面板时向网关补一份历史。 */
+  onRequestEvents?: () => void;
   /** 说话方式：自动（检测到人声才发）/ 常开 / 按住说话，默认自动。 */
   micMode?: MicMode;
   onMicMode?: (mode: MicMode) => void;
@@ -416,6 +422,8 @@ export default function ServerHome(props: Props) {
     onToggleInput,
     onDisconnect,
     onShareLink,
+    serverEvents = [],
+    onRequestEvents,
     micMode = 'auto',
     onMicMode,
     pttHeld = false,
@@ -507,6 +515,7 @@ export default function ServerHome(props: Props) {
   const [banSeconds, setBanSeconds] = useState(600);
   const [filesOpen, setFilesOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [attachBusy, setAttachBusy] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -1599,6 +1608,43 @@ export default function ServerHome(props: Props) {
       </aside>
 
       <SideSheet
+        title="服务器事件"
+        visible={eventsOpen}
+        onCancel={() => setEventsOpen(false)}
+        width={380}
+        placement="right"
+        className="files-sheet"
+      >
+        <div className="files-body sh-events">
+          {serverEvents.length === 0 ? (
+            <div className="sh-events-empty">还没有事件。有人进入服务器、离开或切换频道时会显示在这里。</div>
+          ) : (
+            [...serverEvents].reverse().map((e, i) => {
+              const leaveLabel: Record<number, string> = { 3: '连接丢失', 5: '被踢出', 6: '被封禁', 8: 'leaving' };
+              let text: string;
+              if (e.ev === 'enter') text = `已连接到 ${e.channel || '服务器'}`;
+              else if (e.ev === 'move') text = `已切换到 ${e.to || '频道'}`;
+              else {
+                const r = e.reason != null ? leaveLabel[e.reason] : '';
+                text = `已断开连接${r ? ` (${r})` : ''}`;
+              }
+              return (
+                <div className={`sh-ev-row is-${e.ev}`} key={`${e.time}-${i}`}>
+                  <span className="sh-ev-bar" />
+                  <span className="sh-ev-text">
+                    <b>{e.name}</b> {text}
+                  </span>
+                  <span className="sh-ev-time">
+                    {new Date(e.time).toLocaleTimeString('zh-CN', { hour12: false })}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </SideSheet>
+
+      <SideSheet
         title="设置"
         visible={settingsOpen}
         onCancel={() => setSettingsOpen(false)}
@@ -1820,6 +1866,18 @@ export default function ServerHome(props: Props) {
               onClick={openFriends}
             >
               <IconUserGroup />
+            </Button>
+            <Button
+              className="sh-icon-btn btn-semi"
+              htmlType="button"
+              title="服务器事件"
+              aria-pressed={eventsOpen}
+              onClick={() => {
+                onRequestEvents?.();
+                setEventsOpen((v) => !v);
+              }}
+            >
+              <IconHistory />
             </Button>
             <Button
               className="sh-icon-btn btn-semi"

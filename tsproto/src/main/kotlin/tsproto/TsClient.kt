@@ -525,7 +525,9 @@ class TsClient(private val listener: Listener, private val log: (String) -> Unit
             }
             Type.PING -> sendOutgoing(ByteArray(2).also { it[0] = (id shr 8).toByte(); it[1] = id.toByte() }, Type.PONG)
             Type.PONG -> {
-                // The server answers every keepalive ping, so the oldest unanswered one is this pong's match.
+                // 队列里若积压了多条，说明期间丢过 pong，旧的都作废、只认最新一条，
+                // 否则会永久偏一个 1 秒周期（表现为「网关↔服务器」恒显示约 1024ms）。
+                while (pingSent.size > 1) pingSent.removeFirst()
                 val sentAt = pingSent.removeFirstOrNull()
                 if (sentAt != null) listener.onPing((now() - sentAt).toInt().coerceAtLeast(0))
             }
