@@ -1399,6 +1399,7 @@ class WebSession(
         "uid" to c.uid,
         "talking" to c.talking,
         "away" to c.away,
+        "awayMessage" to c.awayMessage,
         "inputMuted" to c.inputMuted,
         "outputMuted" to c.outputMuted,
         "talkPower" to c.talkPower,

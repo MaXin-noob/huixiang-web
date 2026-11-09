@@ -80,9 +80,7 @@ import {
 } from '../protocol';
 import { avatarColor, avatarSources, initial } from '../ui';
 import { convertShortcodes, isEmojiOnly, EMOJI_LIST } from '../emoji';
-import { gainPercent } from '../audio/gain';
 import VolumePopover from './VolumePopover';
-import AwayPopover from './AwayPopover';
 import UserCard from './UserCard';
 import ChannelIcon from './ChannelIcon';
 import FilesPanel from './FilesPanel';
@@ -421,6 +419,7 @@ export default function ServerHome(props: Props) {
     onSay,
     onRename,
     onToggleInput,
+    onToggleOutput,
     onDisconnect,
     onShareLink,
     serverEvents = [],
@@ -495,6 +494,7 @@ export default function ServerHome(props: Props) {
   const [shareUrl, setShareUrl] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState('');
+  const [awayMsgDraft, setAwayMsgDraft] = useState('');
   /** TeamSpeak 昵称上限 30 个字符。 */
   const NICKNAME_MAX = 30;
   // 设置页里的账号头像：隐藏的文件选择框、上传/删除进行中的标志（防重复点击）。
@@ -976,6 +976,7 @@ export default function ServerHome(props: Props) {
   // 设置页打开时把当前昵称带进输入框；保存后发给网关改服务器昵称。
   const openSettings = () => {
     setNicknameDraft(ownMember?.nickname ?? state.nickname ?? '');
+    setAwayMsgDraft(awayMessage);
     setSettingsOpen(true);
   };
   const saveNickname = () => {
@@ -985,6 +986,10 @@ export default function ServerHome(props: Props) {
     if (name === (ownMember?.nickname ?? state.nickname ?? '')) return;
     onRename?.(name);
     Toast.success('已提交名称修改');
+  };
+  const saveAwayMessage = () => {
+    onSetAwayMessage?.(awayMsgDraft.trim());
+    Toast.success('已保存离开消息');
   };
 
   // 设置页「个人资料」：点头像区的按钮触发隐藏的 file input；选中图片后交给上层压图上传。
@@ -1362,7 +1367,11 @@ export default function ServerHome(props: Props) {
                             直播中
                           </Button>
                         ) : null}
-                        {m.away ? <span className="sh-member-away">离开</span> : null}
+                        {m.away ? (
+                          <span className="sh-member-away" title={m.awayMessage || '离开'}>
+                            离开
+                          </span>
+                        ) : null}
                         {liveHere ? (
                           // 直播中成员始终渲染一个固定宽度的绿点位（不说话时透明），
                           // 避免说话时绿点出现把「直播中」文字挤走。
@@ -1462,14 +1471,22 @@ export default function ServerHome(props: Props) {
               title="麦克风音量"
               value={micGain}
               onChange={(v) => onMicGain?.(v)}
+              trigger="hover"
             >
               <Button
                 className={`sh-me-btn${micOn && micGain > 0 ? ' on' : ''} btn-semi`}
                 htmlType="button"
-                title="麦克风音量（拖到 0 即静音）"
-                aria-label={`麦克风音量 ${gainPercent(micGain)}%`}
+                title={micOn && micGain > 0 ? '点击闭麦（悬停调音量）' : '点击开麦（悬停调音量）'}
+                aria-label={micOn && micGain > 0 ? '闭麦' : '开麦'}
+                aria-pressed={micOn && micGain > 0}
                 onClick={() => {
-                  if (!micOn) void onToggleInput();
+                  if (!micOn) {
+                    void onToggleInput();
+                  } else if (micGain === 0) {
+                    onMicGain?.(1);
+                  } else {
+                    void onToggleInput();
+                  }
                 }}
               >
                 {micOn && micGain > 0 ? <IconMicrophone size="small" /> : <IconMicrophoneOff size="small" />}
@@ -1480,12 +1497,26 @@ export default function ServerHome(props: Props) {
               value={outputGain}
               onChange={(v) => onOutputGain?.(v)}
               zeroHint="为 0 时你听不到声音"
+              trigger="hover"
             >
               <Button
                 className={`sh-me-btn${state.outputMuted || outputGain === 0 ? '' : ' on'} btn-semi`}
                 htmlType="button"
-                title={`扬声器音量 ${gainPercent(outputGain)}%`}
-                aria-label={`扬声器音量 ${gainPercent(outputGain)}%`}
+                title={
+                  state.outputMuted || outputGain === 0
+                    ? '点击取消静音（悬停调音量）'
+                    : '点击静音（悬停调音量）'
+                }
+                aria-label={state.outputMuted || outputGain === 0 ? '取消静音' : '静音'}
+                aria-pressed={state.outputMuted || outputGain === 0}
+                onClick={() => {
+                  // 音量在 0 时点击相当于「恢复音量并取消静音」；否则直接切换静音。
+                  if (outputGain === 0) {
+                    onOutputGain?.(1);
+                    return;
+                  }
+                  onToggleOutput?.();
+                }}
               >
                 {state.outputMuted || outputGain === 0 ? (
                   <IconVolumnSilent size="small" />
@@ -1494,21 +1525,18 @@ export default function ServerHome(props: Props) {
                 )}
               </Button>
             </VolumePopover>
-            <AwayPopover
-              away={away}
-              awayMessage={awayMessage}
-              onToggleAway={(v) => onToggleAway?.(v)}
-              onSetAwayMessage={(m) => onSetAwayMessage?.(m)}
-            >
+            <div className="sh-me-away">
               <Button
                 className={`sh-me-btn${away ? ' on' : ''} btn-semi`}
                 htmlType="button"
-                title={away ? '离开中，点此修改暂离设置' : '设置暂离状态'}
+                title={away ? '离开中，点击取消暂离' : '点击暂离'}
+                aria-label={away ? '取消暂离' : '暂离'}
                 aria-pressed={away}
+                onClick={() => onToggleAway?.(!away)}
               >
                 <IconMoon size="small" />
               </Button>
-            </AwayPopover>
+            </div>
           </div>
         </footer>
 
@@ -1732,6 +1760,35 @@ export default function ServerHome(props: Props) {
           {account.phase !== 'signedIn' && (
             <div className="sh-set-hint">提示：头像属于 myTeamSpeak 账号，先在连接页登录后再来设置。</div>
           )}
+
+          <div className="files-sub">离开消息</div>
+          <div className="sh-set-row">
+            <div className="sh-set-row-text">
+              <div className="sh-set-label">离开消息</div>
+              <div className="sh-set-desc">
+                暂离后别人把鼠标悬停在你的名字上时会看到这条留言；留空则不显示。
+              </div>
+            </div>
+          </div>
+          <div className="sh-nick-row">
+            <Input
+              value={awayMsgDraft}
+              onChange={(v) => setAwayMsgDraft(v)}
+              placeholder="例如：吃饭去了，一会儿回来"
+              maxLength={120}
+              showClear
+              aria-label="离开消息"
+              onEnterPress={saveAwayMessage}
+            />
+            <Button
+              theme="solid"
+              type="primary"
+              disabled={awayMsgDraft.trim() === awayMessage.trim()}
+              onClick={saveAwayMessage}
+            >
+              保存
+            </Button>
+          </div>
 
           <div className="files-sub">通知</div>
           <div className="sh-set-row">

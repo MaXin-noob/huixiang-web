@@ -590,6 +590,12 @@
   color: var(--sh-brand-deep);
 }
 
+/* 暂离：主按钮点击直接切换暂离 */
+.sh-me-away {
+  display: inline-flex;
+  align-items: center;
+}
+
 /* 音量浮层：麦克风 / 扬声器各一个独立小面板（Semi 竖直滑条 + 底部设备条） */
 .sh-vol-backdrop {
   position: absolute;

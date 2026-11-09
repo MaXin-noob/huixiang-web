@@ -10,6 +10,8 @@ export interface Member {
   uid: string;
   talking: boolean;
   away: boolean;
+  /** 离开留言（仅 away=true 时有意义）。 */
+  awayMessage?: string;
   inputMuted: boolean;
   outputMuted: boolean;
   talkPower: number;
