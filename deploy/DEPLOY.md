@@ -406,6 +406,12 @@ sudo systemctl restart huixiang
 | `ALLOWED_ORIGINS` | 空 | 允许的页面来源，逗号分隔。留空只接受同源 |
 | `ACCOUNT_REMEMBER_DAYS` | `30` | myTeamSpeak 登录在浏览器里保留多少天（HttpOnly cookie，会话本身在网关内存）。设 `0` 关闭「记住登录」，每次刷新都要重新登录 |
 | `LOG_LEVEL` | `INFO` | 改成 `DEBUG` 会打印每条服务器命令，排障用，平时别开 |
+| `LIVEKIT_URL` | 空 | 浏览器连 LiveKit 的地址（如 `wss://example.com`，客户端会自动拼 `/rtc`）。留空则「网页直播」选项不可用 |
+| `LIVEKIT_API_URL` | 空 | 网关访问 LiveKit 的内部地址（Docker 里是 `http://livekit:7880`），签 token 不需要，留作健康检查 |
+| `LIVEKIT_API_KEY` | 空 | LiveKit 的 API Key，必须与 LiveKit 配置里的 `keys` 一致 |
+| `LIVEKIT_API_SECRET` | 空 | LiveKit 的 API Secret |
+
+> **网页直播（LiveKit）是可选的独立服务**：它不随网关进程启动，需要单独跑 LiveKit 并做 `/rtc` 反向代理。仓库里 `deploy/docker-compose.sfu.yml` 是一份可直接参考的 Compose（LiveKit + 网关 + 可选 Caddy），手动部署请把上表四个变量写进 `/etc/huixiang/env`，并让 Nginx 把 `/rtc` 转发到 LiveKit 的 7880。
 
 ---
 

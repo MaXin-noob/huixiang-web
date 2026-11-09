@@ -27,12 +27,14 @@ import {
   type MicMode,
   type PersonDetails,
   type State,
+  type WebLivePublisher,
 } from './protocol';
 import { forgetAccount, rememberAccount, removeAccountAvatar, uploadAccountAvatar } from './account';
 import { appendLine, loadPage, mergeLines, serverKey } from './chatHistory';
 import { clampGain, DEFAULT_GAIN } from './audio/gain';
 import { TalkingTracker } from './talking';
 import { StreamClient, initialStreamState, type StreamState } from './stream';
+import { fetchLiveKitToken, reportLivePublishing } from './weblive';
 import { notifyPermission, notifySupported, requestNotifyPermission, showMessageNotice } from './notify';
 import { playJoinCue, playLeaveCue } from './audio/cues';
 import { diffPresence, type PresenceBaseline } from './presence';
@@ -150,6 +152,9 @@ export default function App() {
 
   // 串流：画面是浏览器和对方直连的 WebRTC，网关只管信令
   const [streamState, setStreamState] = useState<StreamState>(initialStreamState);
+
+  // 网页直播（LiveKit）：谁在播由网关广播，随快照带全量列表兜底
+  const [webLive, setWebLive] = useState<WebLivePublisher[]>([]);
 
   const gatewayRef = useRef<Gateway | null>(null);
   const playerRef = useRef<VoicePlayer | null>(null);
@@ -353,6 +358,7 @@ export default function App() {
             presenceBaseline.current = null;
             stateRef.current = null;
             setState(null);
+            setWebLive([]);
             setPersonDetails({});
             setConnecting(false);
             setPing((p) => (p.server == null ? p : { ...p, server: null }));
@@ -401,6 +407,7 @@ export default function App() {
           }
           stateRef.current = st;
           setState(st);
+          setWebLive(st.webLive ?? []);
           if (st.phase === 'connected') {
             setConnecting(false);
             if (st.address) store.addRecent(st.address);
@@ -483,6 +490,15 @@ export default function App() {
           playerRef.current?.play(clientId, codec, opus);
         },
         onStream: (e) => streamRef.current?.onEvent(e),
+        onWebLive: (e) => {
+          setWebLive((prev) => {
+            if (e.event === 'started') {
+              const rest = prev.filter((p) => p.from !== e.from);
+              return [...rest, { from: e.from, name: e.name ?? `成员 ${e.from}` }];
+            }
+            return prev.filter((p) => p.from !== e.from);
+          });
+        },
         onChanOp: (r) => {
           if (r.ok) Toast.success(`${r.label}成功`);
           else Toast.error(`${r.label}失败：${r.error ?? '未知错误'}`);
@@ -511,6 +527,7 @@ export default function App() {
           setConnecting(false);
           talking.reset();
           setState(null);
+          setWebLive([]);
           setChat([]);
           setFiles(null);
           setPersonDetails({});
@@ -558,6 +575,7 @@ export default function App() {
     streamRef.current?.reset();
     streamRef.current = null;
     setStreamState(initialStreamState);
+    setWebLive([]);
     micRef.current?.stop();
     micRef.current = null;
     setMicOn(false);
@@ -593,6 +611,8 @@ export default function App() {
           send: (m) => g.stream(m),
           onChange: setStreamState,
           log: (m) => console.info('[stream]', m),
+          liveKitToken: (publish) => fetchLiveKitToken(stateRef.current?.fileToken ?? '', publish),
+          liveKitPublishState: (active) => void reportLivePublishing(stateRef.current?.fileToken ?? '', active),
         });
         g.connect(opts);
       } catch (e) {
@@ -938,9 +958,20 @@ export default function App() {
     void streamRef.current?.startScreen();
   }, []);
 
+  const shareLive = useCallback(() => {
+    void streamRef.current?.startLiveKit();
+  }, []);
+
   const stopShare = useCallback(() => streamRef.current?.stopShare(), []);
 
-  const watchStream = useCallback((clientId: number) => streamRef.current?.watch(clientId), []);
+  // 看谁在播：网页直播走 LiveKit，老的原生客户端走 P2P 信令
+  const watchStream = useCallback(
+    (clientId: number) => {
+      if (webLive.some((p) => p.from === clientId)) void streamRef.current?.watchLiveKit(clientId);
+      else streamRef.current?.watch(clientId);
+    },
+    [webLive],
+  );
 
   const stopWatch = useCallback(() => streamRef.current?.stopWatch(), []);
 
@@ -1034,6 +1065,7 @@ export default function App() {
         pttHeld={pttHeld}
         audioReady={audioReady}
         stream={streamState}
+        webLive={webLive}
         notifyOn={notifyOn}
         notifySupported={notifySupported()}
         onToggleNotify={toggleNotify}
@@ -1055,6 +1087,7 @@ export default function App() {
         onDisconnect={disconnect}
         onReconnect={reconnectSame}
         onShareScreen={shareScreen}
+        onShareLive={shareLive}
         onStopShare={stopShare}
         onWatch={watchStream}
         onStopWatch={stopWatch}
@@ -1100,6 +1133,7 @@ export default function App() {
     pttHeld,
     audioReady,
     streamState,
+    webLive,
     notifyOn,
     toggleNotify,
     toggleAway,
@@ -1118,6 +1152,7 @@ export default function App() {
     disconnect,
     reconnectSame,
     shareScreen,
+    shareLive,
     stopShare,
     watchStream,
     stopWatch,

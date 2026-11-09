@@ -16,6 +16,7 @@ import type {
   PersonDetails,
   PokeMessage,
   State,
+  WebLiveEvent,
 } from './protocol';
 import type { StreamEvent } from './stream';
 
@@ -50,6 +51,8 @@ export interface GatewayHandlers {
   onVoice?: (codec: number, clientId: number, opus: Uint8Array) => void;
   /** 串流信令：谁开播了、谁要看、以及双方的 SDP 和地址。 */
   onStream?: (event: StreamEvent) => void;
+  /** 网页直播（LiveKit）状态：谁开始/停止推流了。 */
+  onWebLive?: (event: WebLiveEvent) => void;
   /** 一次频道管理操作（建/删/改/踢/封）的结果。 */
   onChanOp?: (result: ChannelOpResult) => void;
   /** 网关这句话走了多久：浏览器 ↔ 网关的 WebSocket 往返（毫秒）。 */
@@ -199,6 +202,9 @@ export class Gateway {
             break;
           case 'stream':
             this.handlers.onStream?.(m as unknown as StreamEvent);
+            break;
+          case 'weblive':
+            this.handlers.onWebLive?.(m as unknown as WebLiveEvent);
             break;
           case 'chanOp':
             this.handlers.onChanOp?.(m as unknown as ChannelOpResult);

@@ -100,6 +100,12 @@ class WebSession(
          */
         private val fileSessions = ConcurrentHashMap<String, WebSession>()
 
+        /**
+         * 所有还开着的标签页。Web-only 直播的「谁在播」需要广播给同频道的其他网页，这里按房间筛一遍就行；
+         * 标签页数量本来就有上限（[Limits.TOTAL]），用 CopyOnWriteArraySet 足够。
+         */
+        private val allSessions = java.util.concurrent.CopyOnWriteArraySet<WebSession>()
+
         /** 一次下载最多这么大。服务器自己也有配额，这里是个防滥用的天花板，也防止一个请求把浏览器撑爆。 */
         const val MAX_FILE_BYTES = 1L shl 30 // 1 GiB
 
@@ -222,6 +228,7 @@ class WebSession(
         banners[bannerId] = this
         fileSessions[fileId] = this
         avatars[avatarId] = this
+        allSessions.add(this)
         pushTimer.scheduleWithFixedDelay({ if (dirty.getAndSet(false)) push() }, PUSH_MS, PUSH_MS, TimeUnit.MILLISECONDS)
     }
 
@@ -325,6 +332,7 @@ class WebSession(
     fun accountRemoveAvatar(): String? = account.removeAvatar()
 
     fun leave() {
+        webLiveStop()
         val c = client ?: run {
             serverKey = ""
             return
@@ -341,6 +349,8 @@ class WebSession(
     }
 
     fun joinChannel(channelId: Int, password: String = "") {
+        // 切频道等于离开这个房间：先把自己的网页直播停掉，免得别人还看到「直播中」。
+        webLiveStop()
         val c = client ?: return
         val own = model.ownClientId
         if (own == 0) return
@@ -639,6 +649,70 @@ class WebSession(
     /** 这个会话的传输令牌。只随状态快照发给这一个标签页，别人拿到也用不上（它认的是会话不是服务器）。 */
     fun fileToken(): String = fileId
 
+    // ====== Web-only 直播（LiveKit）：网关只签 token、记谁在播，媒体不经过这里 ======
+
+    /** 当前标签页所在的房间名（服务器 + 频道）；不在服务器/频道里时为空。 */
+    internal fun liveRoomKey(): String? {
+        if (serverKey.isEmpty()) return null
+        val channel = model.ownChannel?.id ?: return null
+        if (channel <= 0) return null
+        return LiveKit.roomName(serverKey, channel)
+    }
+
+    /** 给同一房间的其他网页写一条事件；线程安全（sink 是 Channel）。 */
+    internal fun liveEmit(json: String) {
+        sink.text(json)
+    }
+
+    /** 页面要一个进房 token；publish=true 是主播，false 是观众。 */
+    fun liveKitToken(publish: Boolean): LiveKit.TokenResult {
+        if (!LiveKitConfig.enabled) {
+            return LiveKit.TokenResult(false, error = "网关没有配置 LiveKit", status = 503)
+        }
+        if (phase != Phase.CONNECTED) {
+            return LiveKit.TokenResult(false, error = "还没有连上服务器", status = 409)
+        }
+        val room = liveRoomKey()?.takeIf { it.isNotEmpty() }
+            ?: return LiveKit.TokenResult(false, error = "还没有加入频道", status = 409)
+        val own = model.ownClient
+            ?: return LiveKit.TokenResult(false, error = "还没有加入频道", status = 409)
+        if (publish && LiveKit.list(room).any { it.clientId != own.id }) {
+            return LiveKit.TokenResult(false, error = "当前已有人在直播", status = 409)
+        }
+        val identity = "c${own.id}_${own.uid.ifBlank { own.id.toString() }}"
+        return LiveKit.TokenResult(
+            ok = true,
+            url = LiveKitConfig.url,
+            token = LiveKit.sign(identity, own.nickname, room, publish),
+        )
+    }
+
+    /** 主播开始推流：登记并广播给同频道。返回 null 表示成功。 */
+    fun webLiveStart(): String? {
+        if (!LiveKitConfig.enabled) return "网关没有配置 LiveKit"
+        val room = liveRoomKey()?.takeIf { it.isNotEmpty() } ?: return "还没有加入频道"
+        val own = model.ownClient ?: return "还没有加入频道"
+        val error = LiveKit.add(room, LiveKit.Publisher(own.id, own.nickname, own.uid))
+        if (error != null) return error
+        broadcastLive(room, mapOf("t" to "weblive", "event" to "started", "from" to own.id, "name" to own.nickname))
+        return null
+    }
+
+    /** 主播停止推流（或切频道/掉线）：撤销登记并广播。 */
+    fun webLiveStop() {
+        val room = liveRoomKey() ?: return
+        val clientId = model.ownClient?.id ?: return
+        val publisher = LiveKit.remove(room, clientId) ?: return
+        broadcastLive(room, mapOf("t" to "weblive", "event" to "stopped", "from" to publisher.clientId))
+    }
+
+    private fun broadcastLive(room: String, message: Map<String, Any?>) {
+        val json = Json.write(message)
+        for (session in allSessions) {
+            if (session.liveRoomKey() == room) session.liveEmit(json)
+        }
+    }
+
     /**
      * 把频道 [cid] 里 [path] 这一层的内容推给标签页。立刻返回：列表要等服务器答，所以在 [listPool] 上跑，
      * 结果以一条 `files` 消息回来，形状和 `state` 一样。
@@ -814,6 +888,7 @@ class WebSession(
         banners.remove(bannerId)
         fileSessions.remove(fileId)
         avatars.remove(avatarId)
+        allSessions.remove(this)
         account.close()
         cloudChat.close()
         leave()
@@ -1078,6 +1153,8 @@ class WebSession(
             "clientCount" to model.clients.values.count { it.type == 0 },
             "fileToken" to fileId,
             "avatarToken" to avatarId,
+            // 同频道里正在网页直播的人：新打开的标签页靠它显示「直播中」，不用等广播。
+            "webLive" to (liveRoomKey()?.let { room -> LiveKit.list(room).map { mapOf("from" to it.clientId, "name" to it.name) } } ?: emptyList()),
             "server" to serverInfo(),
             "tree" to model.tree().map { node(it) },
         )

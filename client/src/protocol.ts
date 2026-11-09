@@ -113,8 +113,24 @@ export interface State {
   fileToken?: string;
   /** 头像地址里的会话令牌；只能读头像，不能读频道文件。 */
   avatarToken?: string;
+  /** 同频道里正在网页直播（LiveKit）的人；打开页面时靠它补上「直播中」。 */
+  webLive?: WebLivePublisher[];
   server?: ServerInfo | null;
   tree: ChannelNode[];
+}
+
+/** 一条 Web-only 直播的状态：谁在播。 */
+export interface WebLivePublisher {
+  from: number;
+  name: string;
+}
+
+/** 网关广播的一条网页直播事件：有人开始/停止推流。 */
+export interface WebLiveEvent {
+  t: 'weblive';
+  event: 'started' | 'stopped';
+  from: number;
+  name?: string;
 }
 
 /** 频道类型：永久 / 半永久 / 临时。 */
