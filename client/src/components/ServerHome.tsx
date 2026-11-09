@@ -496,6 +496,8 @@ export default function ServerHome(props: Props) {
   const [chanDialog, setChanDialog] = useState<{ mode: 'create' | 'edit'; target: ChannelNode | null } | null>(null);
   const [chanForm, setChanForm] = useState<ChanForm>(() => defaultChanForm());
   const [deleteTarget, setDeleteTarget] = useState<ChannelNode | null>(null);
+  const [chanMenuId, setChanMenuId] = useState<number | null>(null);
+  const [memMenuId, setMemMenuId] = useState<number | null>(null);
   // 成员管理：踢出频道 / 踢出服务器 / 封禁（弹窗里填原因、选封禁时长）。
   const [modTarget, setModTarget] = useState<{ member: Member; kind: 'channel' | 'server' | 'ban' } | null>(null);
   const [modReason, setModReason] = useState('');
@@ -1202,24 +1204,27 @@ export default function ServerHome(props: Props) {
                     position="bottomRight"
                     spacing={6}
                     stopPropagation
+                    visible={chanMenuId === channel.id}
+                    onVisibleChange={(v) => setChanMenuId(v ? channel.id : null)}
                     render={
                       <Dropdown.Menu className="sh-chan-dd">
-                        <Dropdown.Item icon={<IconPlus />} onClick={() => openCreateChannel(channel.id)}>
+                        <Dropdown.Item icon={<IconPlus />} onClick={() => { setChanMenuId(null); openCreateChannel(channel.id); }}>
                           <span className="sh-dd-label">新建子频道</span>
                         </Dropdown.Item>
-                        <Dropdown.Item icon={<IconEdit />} onClick={() => openEditChannel(channel)}>
+                        <Dropdown.Item icon={<IconEdit />} onClick={() => { setChanMenuId(null); openEditChannel(channel); }}>
                           <span className="sh-dd-label">编辑频道</span>
                         </Dropdown.Item>
-                        <Dropdown.Item icon={<IconChevronUp />} disabled={!canMoveUp} onClick={() => moveChannel(channel, -1)}>
+                        <Dropdown.Item icon={<IconChevronUp />} disabled={!canMoveUp} onClick={() => { setChanMenuId(null); moveChannel(channel, -1); }}>
                           <span className="sh-dd-label">上移</span>
                         </Dropdown.Item>
-                        <Dropdown.Item icon={<IconChevronDown />} disabled={!canMoveDown} onClick={() => moveChannel(channel, 1)}>
+                        <Dropdown.Item icon={<IconChevronDown />} disabled={!canMoveDown} onClick={() => { setChanMenuId(null); moveChannel(channel, 1); }}>
                           <span className="sh-dd-label">下移</span>
                         </Dropdown.Item>
                         <Dropdown.Divider />
                         <Dropdown.Item
                           icon={<IconCopy />}
                           onClick={() => {
+                            setChanMenuId(null);
                             void navigator.clipboard
                               ?.writeText(String(channel.id))
                               .then(() => Toast.success('已复制频道 ID'))
@@ -1229,7 +1234,7 @@ export default function ServerHome(props: Props) {
                           <span className="sh-dd-label">复制频道 ID</span>
                         </Dropdown.Item>
                         <Dropdown.Divider />
-                        <Dropdown.Item type="danger" icon={<IconDelete />} onClick={() => setDeleteTarget(channel)}>
+                        <Dropdown.Item type="danger" icon={<IconDelete />} onClick={() => { setChanMenuId(null); setDeleteTarget(channel); }}>
                           <span className="sh-dd-label">删除频道</span>
                         </Dropdown.Item>
                       </Dropdown.Menu>
@@ -1317,16 +1322,18 @@ export default function ServerHome(props: Props) {
                             position="bottomRight"
                             spacing={4}
                             stopPropagation
+                            visible={memMenuId === m.id}
+                            onVisibleChange={(v) => setMemMenuId(v ? m.id : null)}
                             render={
                               <Dropdown.Menu className="sh-chan-dd">
-                                <Dropdown.Item onClick={() => openMod(m, 'channel')}>
+                                <Dropdown.Item onClick={() => { setMemMenuId(null); openMod(m, 'channel'); }}>
                                   <span className="sh-dd-label">踢出频道</span>
                                 </Dropdown.Item>
-                                <Dropdown.Item onClick={() => openMod(m, 'server')}>
+                                <Dropdown.Item onClick={() => { setMemMenuId(null); openMod(m, 'server'); }}>
                                   <span className="sh-dd-label">踢出服务器</span>
                                 </Dropdown.Item>
                                 <Dropdown.Divider />
-                                <Dropdown.Item type="danger" onClick={() => openMod(m, 'ban')}>
+                                <Dropdown.Item type="danger" onClick={() => { setMemMenuId(null); openMod(m, 'ban'); }}>
                                   <span className="sh-dd-label">封禁…</span>
                                 </Dropdown.Item>
                               </Dropdown.Menu>
