@@ -79,7 +79,7 @@ export default function ChatAttachment({ att, token }: Props) {
             className="sh-attach-img-el"
             src={url}
             alt={att.name}
-            title={`${att.name} · ${formatBytes(att.size)}（点击查看原图）`}
+            title={att.size > 0 ? `${att.name} · ${formatBytes(att.size)}（点击查看原图）` : `${att.name}（点击查看原图）`}
             onClick={() => window.open(url, '_blank')}
           />
         )}
@@ -87,7 +87,7 @@ export default function ChatAttachment({ att, token }: Props) {
           <span className="sh-attach-name" title={att.name}>
             {att.name}
           </span>
-          <span className="sh-attach-size">{formatBytes(att.size)}</span>
+          <span className="sh-attach-size">{att.size > 0 ? formatBytes(att.size) : ''}</span>
           {dlButton}
         </div>
       </div>
