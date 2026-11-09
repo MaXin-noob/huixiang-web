@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, Toast } from '@douyinfe/semi-ui';
 import { IconDownload, IconFile } from '@douyinfe/semi-icons';
 import { downloadFile, formatBytes, saveBlob } from '../files';
+import { getImageBlobCached, imageCacheKey } from '../imageCache';
 import type { ChatAttachmentInfo } from '../chatAttach';
 
 interface Props {
@@ -26,7 +27,10 @@ export default function ChatAttachment({ att, token }: Props) {
     let objectUrl: string | null = null;
     setPhase('loading');
     setError('');
-    downloadFile({ token, cid: att.cid, path: att.path, expectedSize: att.size })
+    const key = imageCacheKey(att.cid, att.path, att.size);
+    getImageBlobCached(key, () =>
+      downloadFile({ token, cid: att.cid, path: att.path, expectedSize: att.size }),
+    )
       .then((blob) => {
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
