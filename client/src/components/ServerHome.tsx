@@ -1507,7 +1507,15 @@ export default function ServerHome(props: Props) {
                 {
                   node: 'item' as const,
                   name: '共享屏幕 - 网页直播（LiveKit）',
-                  onClick: () => onShareLive?.(),
+                  onClick: () => {
+                    Modal.confirm({
+                      title: '开启网页直播',
+                      content: '该功能仅限浏览器用户使用，原生 TeamSpeak 客户端无法观看。是否继续？',
+                      okText: '继续',
+                      cancelText: '取消',
+                      onOk: () => onShareLive?.(),
+                    });
+                  },
                 },
                 ...(stream.sharing !== null
                   ? [
