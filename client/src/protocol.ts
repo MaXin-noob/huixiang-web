@@ -405,6 +405,11 @@ export interface ConnectOptions {
 /** 说话方式。auto = 本地做人声检测（VAD），安静时不发送。 */
 export type MicMode = 'auto' | 'open' | 'ptt';
 
+/** 戳一戳自定义文案的最大长度（字符）。 */
+export const POKE_TEXT_MAX = 60;
+/** 文案为空时网关补的默认戳一戳文案；前端展示时据此判断是不是默认。 */
+export const DEFAULT_POKE_TEXT = '戳了你一下';
+
 /** 「记住上次麦克风/扬声器开关」的时效：14 天。超过就回到默认（闭麦、扬声器开）。 */
 const MUTE_PREF_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -416,6 +421,7 @@ const KEY = {
   micGain: 'huixiang.micGain',
   outputGain: 'huixiang.outputGain',
   micMode: 'huixiang.micMode',
+  pokeText: 'huixiang.pokeText',
   volumes: 'huixiang.volumes',
   notify: 'huixiang.notify',
   accountLogin: 'huixiang.accountLogin',
@@ -518,6 +524,16 @@ export const store = {
   },
   setMicMode(v: MicMode) {
     localStorage.setItem(KEY.micMode, v);
+  },
+  /**
+   * 戳一戳时随 `clientpoke` 发出的自定义文案。空串表示用默认的「戳了你一下」。
+   * 只是消息内容偏好，跟这台机器走，只存本地。
+   */
+  pokeText(): string {
+    return localStorage.getItem(KEY.pokeText) ?? '';
+  },
+  setPokeText(v: string) {
+    localStorage.setItem(KEY.pokeText, v.slice(0, POKE_TEXT_MAX));
   },
   /** 成员音量：key 见 memberKey（uid 而不是 clientId）。 */
   volumes(): Record<string, number> {

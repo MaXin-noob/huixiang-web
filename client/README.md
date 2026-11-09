@@ -106,6 +106,7 @@ src/
 | `huixiang.recent` | 最近连过的地址，最多 8 条 |
 | `huixiang.micGain` / `huixiang.volumes` | 麦克风增益、按 uid 记的成员音量 |
 | `huixiang.micMode` | 说话方式：`auto` 自动（默认）/ `open` 常开 / `ptt` 按住说话 |
+| `huixiang.pokeText` | 戳一戳时发送的自定义文案（留空用默认「戳了你一下」，最长 60 字） |
 | `huixiang.notify` | 桌面消息通知开关（`1` 开 / `0` 关；真正的权限在浏览器站点设置里） |
 
 myTeamSpeak 的邮箱、密码、会话令牌、书签密钥和云书签内容**都不进 localStorage**：登录会话只保存在网关内存里。浏览器只留一枚 `huixiang_account` 的 `HttpOnly` cookie（随机 id，JS 读不到），用于自动恢复登录；默认 30 天后过期，退出登录会立即清掉。

@@ -3,6 +3,7 @@ import { Toast } from '@douyinfe/semi-ui';
 import { Gateway, tokenRequired } from './gateway';
 import {
   accountNickname,
+  DEFAULT_POKE_TEXT,
   eachMember,
   emptyBookmarks,
   emptyCloud,
@@ -127,6 +128,13 @@ export default function App() {
   const setMicMode = useCallback((m: MicMode) => {
     setMicModeState(m);
     store.setMicMode(m);
+  }, []);
+
+  // 戳一戳自定义文案：随 clientpoke 发给对方。空串则用网关默认的「戳了你一下」。存本地。
+  const [pokeText, setPokeTextState] = useState<string>(() => store.pokeText());
+  const setPokeText = useCallback((t: string) => {
+    setPokeTextState(t);
+    store.setPokeText(t);
   }, []);
 
   // 桌面通知：有新消息时弹系统通知。开关存本地，但真正的权限在浏览器手里——
@@ -513,10 +521,14 @@ export default function App() {
           const me = stateRef.current?.ownId ?? 0;
           if (p.from && p.from === me) return;
           const who = p.name || '有人';
-          Toast.info(`${who} 戳了戳你`);
+          // 对方写了自己的文案就把内容带上；默认那句（戳了你一下）不重复显示。
+          const custom = (p.msg ?? '').trim();
+          const suffix = custom && custom !== DEFAULT_POKE_TEXT ? `：${custom}` : '';
+          const title = `${who} 戳了戳你${suffix}`;
+          Toast.info(title);
           if (notifyOnRef.current) {
             const hidden = document.visibilityState === 'hidden' || !document.hasFocus();
-            if (hidden) showMessageNotice({ title: `${who} 戳了戳你`, body: '', tag: `poke:${p.from}` });
+            if (hidden) showMessageNotice({ title, body: '', tag: `poke:${p.from}` });
           }
         },
         onClose: (code) => {
@@ -1009,7 +1021,10 @@ export default function App() {
   const requestPerson = useCallback((clientId: number) => gatewayRef.current?.requestPerson(clientId), []);
 
   /** 戳一戳某个成员；成功/失败由网关的 onChanOp 回执弹提示。 */
-  const poke = useCallback((clientId: number) => gatewayRef.current?.poke(clientId), []);
+  const poke = useCallback(
+    (clientId: number) => gatewayRef.current?.poke(clientId, pokeText.trim()),
+    [pokeText],
+  );
 
   const content = useMemo(() => {
     if (!state) {
@@ -1104,6 +1119,8 @@ export default function App() {
         personDetails={personDetails}
         onPerson={requestPerson}
         onPoke={poke}
+        pokeText={pokeText}
+        onPokeText={setPokeText}
       />
     );
   }, [
@@ -1179,6 +1196,8 @@ export default function App() {
     personDetails,
     requestPerson,
     poke,
+    pokeText,
+    setPokeText,
   ]);
 
   return (
