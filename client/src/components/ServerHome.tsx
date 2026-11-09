@@ -91,6 +91,7 @@ import ChatAttachment from './ChatAttachment';
 import { encodeAttachment, parseAttachment, encodeChannelPicture, parseChannelPicture, parseMyTsFile, type ChatAttachmentInfo } from '../chatAttach';
 import { formatBytes, uploadFile } from '../files';
 import { makeChannelIconPng } from '../iconImage';
+import { toAsciiUploadName } from '../uploadName';
 import './server-home.css';
 
 /** AIChatDialogue 的角色元数据：聊天记录里所有成员都按 user 角色渲染。 */
@@ -891,8 +892,10 @@ export default function ServerHome(props: Props) {
     }
     setAttachBusy(true);
     // 根目录下用时间戳前缀防重名；去掉路径分隔符等非法字符，免得网关拒绝。
+    // 服务器不接受中文/非 ASCII 文件名（会报 file input/output error），先自动换成英文名。
     const stamp = Date.now().toString(36);
-    const safe = file.name.replace(/[\\/:*?"<>|]/g, '_') || 'file';
+    const uploadName = toAsciiUploadName(file.name);
+    const safe = uploadName.replace(/[\\/:*?"<>|]/g, '_') || 'file';
     const path = `/${stamp}-${safe}`;
     try {
       await uploadFile({ token: fileToken, cid: state.ownChannel, path, file });
@@ -1360,6 +1363,10 @@ export default function ServerHome(props: Props) {
                         ) : null}
                         {m.away ? <span className="sh-member-away">离开</span> : null}
                         {speaking ? <span className="sh-member-dot" /> : null}
+                        {m.id === state.ownId && (
+                          // 自己那行没有「成员管理」按钮，补一个同宽的占位，保证说话绿点和别人对齐
+                          <span className="sh-member-more sh-member-more-ghost" aria-hidden="true" />
+                        )}
                         {m.id !== state.ownId && (
                           <Dropdown
                             trigger="click"

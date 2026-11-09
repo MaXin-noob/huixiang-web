@@ -23,6 +23,7 @@ import {
   uploadFile,
   type FileOpError,
 } from '../files';
+import { toAsciiUploadName } from '../uploadName';
 
 interface Props {
   open: boolean;
@@ -156,11 +157,13 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
         Toast.error('还没连上服务器');
         return;
       }
-      const target = joinPath(path, file.name);
+      // 服务器不接受中文/非 ASCII 文件名（file input/output error），上传前自动换成英文名
+      const uploadName = toAsciiUploadName(file.name);
+      const target = joinPath(path, uploadName);
       const id = nextId();
       setTransfers((prev) => [
         ...prev,
-        { id, name: file.name, dir: 'up', done: 0, total: file.size, state: 'running' },
+        { id, name: uploadName, dir: 'up', done: 0, total: file.size, state: 'running' },
       ]);
       void uploadFile({
         token,
