@@ -79,6 +79,10 @@ class ServerModel {
         val country: String = "",
         val platform: String = "",
         val version: String = "",
+        /** 官方 MyTeamSpeak 用户标签原始 JSON（client_user_tag）；空表示没有。 */
+        val userTag: String = "",
+        /** 连接时刻（Unix 秒）；0 表示服务器没给。 */
+        val connectionStart: Long = 0,
     )
 
     /** A server or channel group: its name and icon, and its place in the order. */
@@ -364,6 +368,8 @@ class ServerModel {
         country = g["client_country"] ?: old.country,
         platform = g["client_platform"] ?: old.platform,
         version = g["client_version"] ?: old.version,
+        userTag = g["client_user_tag"] ?: old.userTag,
+        connectionStart = g["client_connection_start_time"]?.toLongOrNull() ?: old.connectionStart,
         avatarName = g["client_base64HashClientUID"]?.takeIf { Regex("^[a-p]{32,128}$").matches(it) } ?: old.avatarName,
         // Only the one place myTeamSpeak keeps pictures is accepted
         myTeamSpeakAvatar = g["client_myteamspeak_avatar"]?.let { MYTS_AVATAR.matchEntire(it.trim())?.groupValues?.get(1).orEmpty() } ?: old.myTeamSpeakAvatar,

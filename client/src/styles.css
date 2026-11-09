@@ -4377,8 +4377,9 @@ button.files-name:hover {
 }
 
 .uc-row dt {
-  flex: 0 0 48px;
+  flex: 0 0 52px;
   color: var(--text-4);
+  white-space: nowrap;
 }
 
 .uc-row dd {
@@ -4407,6 +4408,25 @@ button.files-name:hover {
   background: rgba(108, 75, 246, 0.1);
   color: #6c4bf6;
   white-space: nowrap;
+}
+
+/* MyTeamSpeak 已验证标签徽标（来自官方 client_user_tag） */
+.uc-badge.uc-myts {
+  color: #6c4bf6;
+  background: rgba(108, 75, 246, 0.12);
+}
+
+/* 资料卡里展示的公开用户标签（tag 文本） */
+.uc-tag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: #6c4bf6;
+  word-break: break-all;
+}
+
+/* 客户端自报的描述，保留换行 */
+.uc-desc {
+  white-space: pre-wrap;
 }
 
 .user-card-desc {

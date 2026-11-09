@@ -3,6 +3,33 @@ import type { Member, PersonDetails } from '../protocol';
 import { avatarSources } from '../ui';
 import UserAvatar from './UserAvatar';
 
+/** client_user_tag 可能是官方签名 JSON；只取其中公开的 tag 文本，取不到就按原文显示。 */
+function parseUserTag(raw?: string): string {
+  const text = (raw ?? '').trim();
+  if (!text) return '';
+  try {
+    const obj = JSON.parse(text) as { tag?: unknown };
+    if (obj && typeof obj.tag === 'string' && obj.tag.trim()) return obj.tag.trim();
+  } catch {
+    /* 不是 JSON，按原文处理 */
+  }
+  return text;
+}
+
+/** 把 Unix 秒的连接时刻换算成「已在线多久」，服务器没给（<=0）时返回空串。 */
+function formatOnlineDuration(fromUnixSeconds?: number): string {
+  if (!fromUnixSeconds || fromUnixSeconds <= 0) return '';
+  const diff = Math.floor(Date.now() / 1000) - fromUnixSeconds;
+  if (diff < 0) return '';
+  const day = Math.floor(diff / 86400);
+  const hour = Math.floor((diff % 86400) / 3600);
+  const minute = Math.floor((diff % 3600) / 60);
+  if (day > 0) return `${day} 天 ${hour} 小时`;
+  if (hour > 0) return `${hour} 小时 ${minute} 分`;
+  if (minute > 0) return `${minute} 分钟`;
+  return '刚刚';
+}
+
 interface Props {
   member: Member;
   /** 这个人所在频道名（舞台里就是当前频道）。 */
@@ -10,7 +37,7 @@ interface Props {
   ownId: number;
   accountAvatar: string;
   avatarToken: string;
-  /** 服务器补问回来的公开字段（保留参数，卡片暂不展示）。 */
+  /** 服务器补问回来的公开字段：描述、地区、客户端、在线时长、MyTeamSpeak 用户标签。 */
   details?: PersonDetails;
   /** 个人音量（0–2，0 = 单独静音），缺省 1。 */
   volume?: number;
@@ -26,7 +53,7 @@ interface Props {
 
 /**
  * 用户资料卡：悬停在成员上时浮出来的一张小卡片。
- * 只显示「频道、身份组、音量」三项；音量按 uid 记，0 = 单独静音这个人。
+ * 显示频道、身份组、音量，以及服务器公开的资料（地区、客户端、在线时长、描述）和 MyTeamSpeak 用户标签。
  */
 export default function UserCard({
   member,
@@ -34,6 +61,7 @@ export default function UserCard({
   ownId,
   accountAvatar,
   avatarToken,
+  details,
   volume = 1,
   onVolume,
   onPoke,
@@ -43,6 +71,13 @@ export default function UserCard({
   const isLive = live ?? member.streaming;
   const groups = [member.channelGroup, ...member.serverGroups].filter((g) => !!g && g.trim().length > 0);
   const pct = Math.round(Math.min(2, Math.max(0, volume)) * 100);
+  const userTag = parseUserTag(details?.userTag || member.userTag);
+  const country = (details?.country || member.country || '').trim();
+  const clientLabel = [(details?.platform || member.platform || '').trim(), (details?.version || member.version || '').trim()]
+    .filter(Boolean)
+    .join(' ');
+  const onlineFor = formatOnlineDuration(details?.connectionTime || member.connectionTime);
+  const description = (details?.description || member.description || '').trim();
 
   return (
     <div className="user-card">
@@ -70,6 +105,11 @@ export default function UserCard({
             {member.inputMuted && <span className="uc-badge uc-mute">麦克风静音</span>}
             {!member.inputMuted && member.outputMuted && <span className="uc-badge uc-mute">扬声器静音</span>}
             {member.priority && <span className="uc-badge uc-priority">优先发言人</span>}
+            {userTag && (
+              <span className="uc-badge uc-myts" title={userTag}>
+                MyTeamSpeak 已验证
+              </span>
+            )}
           </div>
         </div>
         {!me && onPoke && (
@@ -104,6 +144,36 @@ export default function UserCard({
                 </span>
               ))}
             </dd>
+          </div>
+        )}
+        {country && (
+          <div className="uc-row">
+            <dt>地区</dt>
+            <dd>{country}</dd>
+          </div>
+        )}
+        {clientLabel && (
+          <div className="uc-row">
+            <dt>客户端</dt>
+            <dd>{clientLabel}</dd>
+          </div>
+        )}
+        {onlineFor && (
+          <div className="uc-row">
+            <dt>在线时长</dt>
+            <dd>{onlineFor}</dd>
+          </div>
+        )}
+        {userTag && (
+          <div className="uc-row">
+            <dt>标签</dt>
+            <dd className="uc-tag">{userTag}</dd>
+          </div>
+        )}
+        {description && (
+          <div className="uc-row">
+            <dt>描述</dt>
+            <dd className="uc-desc">{description}</dd>
           </div>
         )}
         {!me && (

@@ -416,12 +416,13 @@ class WebSession(
     }
 
     /**
-     * 前端要看某人的资料卡：单独问一次服务器（clientgetvariables），只把服务器愿意公开的字段回给前端。
-     * 用 return_code=person-<clid> 认这一条应答；服务器拒绝（2568）时不会带这个 return_code，前端就只看本地快照。
+     * 前端要看某人的资料卡：单独问一次服务器（clientinfo 能拿到平台/版本/地区/描述；权限不足时会回 2568），
+     * 只把服务器愿意公开的字段回给前端。
+     * 用 return_code=person-<clid> 认这一条应答；服务器拒绝时不会带这个 return_code，前端就只看本地快照。
      */
     fun personDetails(clid: Int) {
         val c = client ?: return
-        c.sendCommand(Commands.build("clientgetvariables", "clid" to clid, "return_code" to "person-$clid"))
+        c.sendCommand(Commands.build("clientinfo", "clid" to clid, "return_code" to "person-$clid"))
     }
 
     /**
@@ -1054,7 +1055,7 @@ class WebSession(
             }
             // 某人的资料卡：只认我们主动问过的那条应答（return_code=person-<clid>），
             // 把服务器愿意公开的字段转给前端补全（版本、平台、地区、在线时长、描述）。
-            "clientvariables" -> {
+            "clientinfo", "clientvariables" -> {
                 val rc = cmd["return_code"].orEmpty()
                 if (rc.startsWith("person-")) {
                     for (g in cmd.groups) {
@@ -1069,6 +1070,7 @@ class WebSession(
                                     "platform" to g["client_platform"].orEmpty(),
                                     "version" to g["client_version"].orEmpty(),
                                     "connectionTime" to (g["client_connection_start_time"]?.toLongOrNull() ?: 0L),
+                                    "userTag" to userTagText(g["client_user_tag"]),
                                 )
                             )
                         )
@@ -1312,8 +1314,30 @@ class WebSession(
         "avatar" to c.avatar,
         "avatarName" to c.avatarName,
         "myTeamSpeakAvatar" to c.myTeamSpeakAvatar,
+        "userTag" to userTagText(c.userTag),
+        "description" to c.description,
+        "country" to c.country,
+        "platform" to c.platform,
+        "version" to c.version,
+        "connectionTime" to c.connectionStart,
         "channelGroup" to (model.channelGroups[c.channelGroup]?.name ?: ""),
         "serverGroups" to c.serverGroups.mapNotNull { model.serverGroups[it]?.name },
         "badges" to model.badges(c),
     )
+
+    /**
+     * client_user_tag 是官方签名的 JSON（{myts_token, tag, updated}）；网页只展示公开的 tag 文本，
+     * 不把签名令牌带进前端。解析失败或没有 tag 时返回空串。
+     */
+    private fun userTagText(raw: String?): String {
+        val text = raw?.trim().orEmpty()
+        if (text.isEmpty()) return ""
+        return try {
+            val parsed = Json.parse(text)
+            val tag = (parsed as? Map<*, *>)?.get("tag") as? String
+            tag?.trim().orEmpty()
+        } catch (_: Exception) {
+            ""
+        }
+    }
 }
