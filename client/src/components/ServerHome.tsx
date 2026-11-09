@@ -14,9 +14,12 @@ import {
   Select,
   SideSheet,
   Slider,
+  Space,
   Switch,
+  Tag,
   TextArea,
   Toast,
+  Typography,
 } from '@douyinfe/semi-ui';
 import {
   IconMore,
@@ -39,9 +42,13 @@ import {
   IconExit,
   IconMoon,
   IconSetting,
+  IconGlobe,
+  IconServer,
+  IconPulse,
 } from '@douyinfe/semi-icons';
 import StreamPanel from './StreamPanel';
 import { initialStreamState, type StreamState } from '../stream';
+import type { PingSample } from '../pingStats';
 import {
   eachMember,
   emptyCloud,
@@ -100,10 +107,10 @@ interface Props {
   onAvatarChange?: (file: File) => void | Promise<void>;
   /** 删除 myTeamSpeak 账号头像。 */
   onAvatarRemove?: () => void | Promise<void>;
-  /** 浏览器 ↔ 网关的 WebSocket 往返（ms），未知为 null。 */
-  pingGateway: number | null;
-  /** 网关 ↔ TeamSpeak 的 UDP 往返（ms），未知为 null。 */
-  pingServer: number | null;
+  /** 浏览器 ↔ 网关的 WebSocket 往返：过去 5 秒的均值 ± 标准差（ms），未知为 null。 */
+  pingGateway: PingSample | null;
+  /** 网关 ↔ TeamSpeak 的 UDP 往返：过去 5 秒的均值 ± 标准差（ms），未知为 null。 */
+  pingServer: PingSample | null;
   micOn: boolean;
   micLevel: number;
   ownTalking: boolean;
@@ -873,9 +880,26 @@ export default function ServerHome(props: Props) {
       : null;
   const createdAt = info?.createdAt ? new Date(info.createdAt * 1000).toLocaleDateString('zh-CN') : null;
   // 延迟拆两段：浏览器↔网关（WebSocket）、网关↔服务器（UDP ping）。悬停看明细。
-  const pingTotal = pingGateway != null && pingServer != null ? pingGateway + pingServer : null;
-  const latencyValue = pingTotal ?? pingServer ?? pingGateway;
-  const latency = latencyValue != null ? `延迟 ${latencyValue} ms` : '延迟 —';
+  // 每段都用「过去 5 秒的均值 ± 标准差」表示，对齐 TeamSpeak 官方 CONNECTION_PING / _DEVIATION。
+  const fmtPing = (s: PingSample | null) =>
+    s != null ? `${Math.round(s.mean)} ms ±${s.std.toFixed(1)}` : '—';
+  // 两段串联：均值直接相加；标准差按两段相互独立合成（σ = √(σ₁² + σ₂²)）。
+  const pingTotal =
+    pingGateway != null && pingServer != null
+      ? { mean: pingGateway.mean + pingServer.mean, std: Math.hypot(pingGateway.std, pingServer.std) }
+      : null;
+  const latencySample = pingTotal ?? pingServer ?? pingGateway;
+  const latency = latencySample != null ? `延迟 ${fmtPing(latencySample)}` : '延迟 —';
+  // 连接质量分档：给明细面板的状态徽标与彩色虚线分隔着色（对齐官方视觉）。
+  const pingTone = (s: PingSample | null) =>
+    s == null ? 'none' : s.mean < 80 ? 'good' : s.mean < 150 ? 'ok' : 'bad';
+  const toneText: Record<string, string> = { good: '良好', ok: '一般', bad: '较差', none: '—' };
+  const toneTag: Record<string, 'green' | 'orange' | 'red' | 'grey'> = {
+    good: 'green',
+    ok: 'orange',
+    bad: 'red',
+    none: 'grey',
+  };
   const banner = info?.bannerUrl ?? null;
 
   const ownMember = findMember(state.tree, state.ownId);
@@ -962,20 +986,47 @@ export default function ServerHome(props: Props) {
                 <Popover
                   trigger="hover"
                   position="bottomLeft"
+                  showArrow={false}
+                  style={{ padding: '12px 16px', borderRadius: 12 }}
                   content={
-                    <div className="sh-latency-detail">
-                      <div className="sh-latency-row">
-                        <span>浏览器 ↔ 网关</span>
-                        <b>{pingGateway != null ? `${pingGateway} ms` : '—'}</b>
+                    <div className="sh-lat-panel">
+                      <div className="sh-lat-head">
+                        <Typography.Text strong className="sh-lat-title">
+                          连接状态
+                        </Typography.Text>
+                        <Tag size="small" type="light" color={toneTag[pingTone(latencySample)]}>
+                          {toneText[pingTone(latencySample)]}
+                        </Tag>
                       </div>
-                      <div className="sh-latency-row">
-                        <span>网关 ↔ 服务器</span>
-                        <b>{pingServer != null ? `${pingServer} ms` : '—'}</b>
-                      </div>
-                      <div className="sh-latency-row sh-latency-total">
-                        <span>合计</span>
-                        <b>{pingTotal != null ? `${pingTotal} ms` : '—'}</b>
-                      </div>
+                      <Space vertical spacing={0} className="sh-lat-rows">
+                        <div className="sh-lat-row">
+                          <Typography.Text type="tertiary" size="small" className="sh-lat-key">
+                            <IconGlobe size="small" className="sh-lat-ico" />
+                            浏览器 ↔ 网关
+                          </Typography.Text>
+                          <Typography.Text strong className="sh-lat-val">
+                            {fmtPing(pingGateway)}
+                          </Typography.Text>
+                        </div>
+                        <div className="sh-lat-row">
+                          <Typography.Text type="tertiary" size="small" className="sh-lat-key">
+                            <IconServer size="small" className="sh-lat-ico" />
+                            网关 ↔ 服务器
+                          </Typography.Text>
+                          <Typography.Text strong className="sh-lat-val">
+                            {fmtPing(pingServer)}
+                          </Typography.Text>
+                        </div>
+                        <div className="sh-lat-row is-total">
+                          <Typography.Text type="tertiary" size="small" className="sh-lat-key">
+                            <IconPulse size="small" className="sh-lat-ico" />
+                            合计
+                          </Typography.Text>
+                          <Typography.Text strong className="sh-lat-val is-total">
+                            {fmtPing(pingTotal)}
+                          </Typography.Text>
+                        </div>
+                      </Space>
                     </div>
                   }
                 >
