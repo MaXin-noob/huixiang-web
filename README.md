@@ -100,6 +100,8 @@ docker run -d --restart=always \
   --name huixiang-web huixiang-web
 ```
 
+> 需要「网页直播（LiveKit）」时，单容器方式不够：用 [deploy/docker-compose.sfu.yml](deploy/docker-compose.sfu.yml) 整套启动，或在单容器外另起 LiveKit 并设置 `LIVEKIT_URL` / `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`，详见 [deploy/DEPLOY.md](deploy/DEPLOY.md) 第 8.1 节。
+
 常用环境变量：
 
 | 变量 | 默认 | 说明 |
