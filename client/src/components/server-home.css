@@ -1603,35 +1603,61 @@
   background: rgba(239, 68, 68, 0.1);
 }
 
-/* ---------------- 延迟明细（悬停显示两段） ---------------- */
-.sh-latency-detail {
-  min-width: 168px;
-  padding: 2px 4px;
-  font-size: 12.5px;
-  color: var(--sh-text-1, #1f2329);
+/* ---------------- 延迟明细（悬停两段，Semi 组件，圆角白卡风格） ---------------- */
+.sh-lat-panel {
+  width: 264px;
 }
 
-.sh-latency-row {
+.sh-lat-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 3px 0;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--semi-color-border);
 }
 
-.sh-latency-row span {
-  color: var(--sh-text-3, #8f959e);
+.sh-lat-title {
+  font-size: 13px;
+  color: var(--semi-color-text-0);
 }
 
-.sh-latency-row b {
-  font-weight: 600;
-  color: var(--sh-text-1, #1f2329);
+.sh-lat-rows {
+  width: 100%;
 }
 
-.sh-latency-total {
-  margin-top: 2px;
-  padding-top: 6px;
-  border-top: 1px solid var(--sh-line-soft, rgba(0, 0, 0, 0.08));
+.sh-lat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--semi-color-border);
+}
+
+.sh-lat-row:last-child {
+  border-bottom: none;
+}
+
+.sh-lat-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--semi-color-text-2);
+}
+
+.sh-lat-ico {
+  color: var(--semi-color-text-3);
+  fill: currentColor;
+}
+
+.sh-lat-val {
+  font-variant-numeric: tabular-nums;
+}
+
+.sh-lat-row.is-total .sh-lat-val {
+  color: var(--semi-color-success);
 }
 
 /* ===== 频道管理：行内「更多」、悬浮菜单、表单弹窗 ===== */
