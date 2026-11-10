@@ -264,17 +264,19 @@ class WebSession(
 
     // ====== What the tab asks for ======
 
-    fun connect(host: String, port: Int, nickname: String, password: String, identityText: String?, channel: String = "", channelPassword: String = "", guest: Boolean = false) {
+    fun connect(host: String, port: Int, nickname: String, password: String, identityText: String?, channel: String = "", channelPassword: String = "", guest: Boolean = false, cloudIdentityId: String? = null) {
         if (closed) return
         // 游客登录：彻底按游客处理——先清掉本标签页可能已恢复的账号会话，
         // 下面连接时不携带任何账号身份证明，服务器只会看到未登录客户端。
         if (guest && account.voiceIdentity() != null) accountLogout()
         leave()
+        val useAccountIdentity = !guest && account.hasAccountOrPending()
         val identity = try {
-            if (identityText.isNullOrBlank()) Identity.generate() else Identity.import(identityText)
+            if (useAccountIdentity) account.syncedIdentity(cloudIdentityId) ?: throw IllegalArgumentException("Account identity unavailable")
+            else if (identityText.isNullOrBlank()) Identity.generate() else Identity.import(identityText)
         } catch (e: Exception) {
             log("Could not read the identity the tab sent: ${e.message}")
-            fail("身份数据无法读取，请重新生成")
+            fail(if (useAccountIdentity) "账号同步身份不可用；请检查同步状态，或选择一个账号同步身份。" else "身份数据无法读取，请重新生成")
             return
         }
         this.nickname = nickname
@@ -287,7 +289,8 @@ class WebSession(
         channelPasswords.clear()
         pendingChannelPassword = channelPassword
         dirty.set(true)
-        sink.text(Json.write(mapOf("t" to "identity", "v" to identity.export())))
+        // Only a locally generated identity is returned to the browser; cloud private keys stay in gateway memory.
+        if (!useAccountIdentity) sink.text(Json.write(mapOf("t" to "identity", "v" to identity.export())))
 
         // 游客：不携带账号身份证明，服务器只会当成未登录客户端。
         val myTsIdentity = if (guest) null else account.voiceIdentity()
