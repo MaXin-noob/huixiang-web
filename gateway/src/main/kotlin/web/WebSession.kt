@@ -13,6 +13,7 @@ import tsproto.ServerModel
 import tsproto.TsClient
 import tsproto.MyTsVoiceIdentity
 import java.io.OutputStream
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -71,10 +72,34 @@ class WebSession(
         private const val BAN_FLOODING = "3331" // ban_flooding
 
         /**
-         * The banners of the live sessions, looked up by the token in the state's banner address. One tab per server
-         * downloads its own copy; two tabs on the same server cost one extra file transfer, which is fine at tab scale.
+         * 服务器横幅的共享缓存：键是横幅地址（gfx url）的稳定哈希，所以同一张横幅在不同标签页、不同刷新之间
+         * 都是同一个地址——浏览器能命中缓存，网关也不必每次向 TeamSpeak 重下一遍（实测一张横幅可达 2.9MB）。
          */
-        private val banners = ConcurrentHashMap<String, WebSession>()
+        private data class CachedBanner(val bytes: ByteArray, val type: String)
+        private const val BANNER_CACHE_BYTES = 64L * 1024 * 1024
+        private val bannerCache = object : LinkedHashMap<String, CachedBanner>(16, 0.75f, true) {}
+        private var bannerCacheBytes = 0L
+
+        /** 横幅地址的稳定键：地址不变则键不变；服务器换图（地址变）自然就是新地址、新键。 */
+        fun bannerCacheKey(gfx: String): String =
+            MessageDigest.getInstance("SHA-256").digest(gfx.toByteArray()).joinToString("") { "%02x".format(it) }.take(32)
+
+        /** 路由取用：已缓存的横幅字节与内容类型（没有则 null）。 */
+        fun cachedBanner(key: String): Pair<ByteArray, String>? = synchronized(bannerCache) { bannerCache[key] }?.let { it.bytes to it.type }
+
+        private fun rememberBanner(key: String, b: CachedBanner) {
+            synchronized(bannerCache) {
+                bannerCache[key]?.let { bannerCacheBytes -= it.bytes.size }
+                bannerCache[key] = b
+                bannerCacheBytes += b.bytes.size
+                val entries = bannerCache.entries.iterator()
+                while ((bannerCache.size > 32 || bannerCacheBytes > BANNER_CACHE_BYTES) && entries.hasNext()) {
+                    val entry = entries.next()
+                    bannerCacheBytes -= entry.value.bytes.size
+                    entries.remove()
+                }
+            }
+        }
 
         /**
          * Avatar image addresses are opened by `<img>`, which cannot send the file token as a header, so the address
@@ -112,8 +137,6 @@ class WebSession(
 
         fun byFile(id: String): WebSession? = fileSessions[id]
 
-        fun byBanner(id: String): WebSession? = banners[id]
-
         fun byAvatar(id: String): WebSession? = avatars[id]
     }
 
@@ -134,8 +157,6 @@ class WebSession(
     private val pendingOps = ConcurrentHashMap<String, OpState>()
 
     private class OpState(val label: String, var remaining: Int, var failed: Boolean = false)
-
-    private val bannerId = UUID.randomUUID().toString().replace("-", "")
 
     /**
      * The token the HTTP transfer endpoints look this session up by. Handed to the tab in every state snapshot,
@@ -213,6 +234,9 @@ class WebSession(
     @Volatile private var banner: ByteArray? = null
     @Volatile private var bannerType = "image/png"
 
+    /** 当前横幅的稳定缓存键（横幅地址的哈希）；null 表示还没有可展示的 ts3image 横幅。 */
+    @Volatile private var currentBannerKey: String? = null
+
     /** The gfx address the current [banner] belongs to: when the server changes it, the cache goes stale. */
     @Volatile private var lastBannerUrl: String? = null
 
@@ -232,7 +256,6 @@ class WebSession(
     @Volatile private var closed = false
 
     init {
-        banners[bannerId] = this
         fileSessions[fileId] = this
         avatars[avatarId] = this
         allSessions.add(this)
@@ -277,6 +300,7 @@ class WebSession(
         ft = FileTransfer(c)
         lastBannerUrl = null
         banner = null
+        currentBannerKey = null
         c.connect(
             TsClient.Options(
                 host = host,
@@ -936,7 +960,6 @@ class WebSession(
 
     fun close() {
         closed = true
-        banners.remove(bannerId)
         fileSessions.remove(fileId)
         avatars.remove(avatarId)
         allSessions.remove(this)
@@ -1294,11 +1317,13 @@ class WebSession(
     private fun serverInfo(): Map<String, Any?> {
         val v = model.serverVars
         val gfx = v["virtualserver_hostbanner_gfx_url"]?.trim().orEmpty()
-        // https 的浏览器自己加载；ts3image 的走本会话下载好的字节，还没到就先不给
+        // https 的浏览器自己加载；ts3image 的走共享缓存（按横幅地址的稳定键），还没到就先不给
+        val bytes = banner
+        val key = currentBannerKey
         val bannerUrl = when {
             gfx.startsWith("https://", ignoreCase = true) -> gfx
-            // 地址里带上内容的版本号：同一张横幅在不同会话/刷新之间是同一个地址，浏览器才能命中缓存。
-            banner != null -> "/server-banner/$bannerId?v=${banner.contentHashCode().toUInt().toString(16)}"
+            // 地址带上内容的版本号：内容不变则地址不变，浏览器与反代才能命中缓存。
+            bytes != null && key != null -> "/server-banner/$key?v=${bytes.contentHashCode().toUInt().toString(16)}"
             else -> null
         }
         return linkedMapOf(
@@ -1317,25 +1342,41 @@ class WebSession(
         )
     }
 
-    /** 服务器换了横幅地址（或刚连上）：https 的直接给浏览器，ts3image 的在后台线程拉字节。 */
+    /** 服务器换了横幅地址（或刚连上）：https 的直接给浏览器，ts3image 的走共享缓存，缓存缺失才后台拉字节。 */
     private fun maybeFetchBanner() {
         val url = model.serverVars["virtualserver_hostbanner_gfx_url"]?.trim().orEmpty()
         if (url.isEmpty() || url == lastBannerUrl) return
         lastBannerUrl = url
-        banner = null
         val f = ft ?: return
         if (url.startsWith("https://", ignoreCase = true)) {
+            banner = null
+            currentBannerKey = null
             dirty.set(true)
             return
         }
         val pic = Pictures.channelPicture(url) ?: return
+        val key = bannerCacheKey(url)
+        // 其它标签页 / 上一次刷新已经下过同一张横幅：直接复用，省掉这次传输，也能立刻给浏览器地址。
+        cachedBanner(key)?.let { (bytes, type) ->
+            banner = bytes
+            bannerType = type
+            currentBannerKey = key
+            dirty.set(true)
+            log("$address: banner cache hit (key=$key, ${bytes.size} bytes)")
+            return
+        }
+        banner = null
+        currentBannerKey = null
         Thread {
             try {
                 val bytes = f.download(pic.cid, pic.path, MAX_BANNER_BYTES)
+                val type = bannerContentType(pic.name)
+                rememberBanner(key, CachedBanner(bytes, type))
                 banner = bytes
-                bannerType = bannerContentType(pic.name)
+                bannerType = type
+                currentBannerKey = key
                 dirty.set(true)
-                log("$address: banner ${bytes.size} bytes")
+                log("$address: banner ${bytes.size} bytes (key=$key)")
             } catch (e: Exception) {
                 log("$address: banner download failed: ${e.message}")
             }
@@ -1369,9 +1410,6 @@ class WebSession(
         rememberAvatar(key, CachedAvatar(bytes, type.mime))
         return bytes to type.mime
     }
-
-    /** The banner bytes for [byBanner], or null when this session has none (yet). */
-    fun bannerData(): Pair<ByteArray, String>? = banner?.let { it to bannerType }
 
     private fun node(n: ServerModel.Node): Map<String, Any?> = linkedMapOf(
         "id" to n.channel.id,

@@ -320,17 +320,19 @@ fun Application.gateway(dist: File, access: Access, history: ChannelHistory) {
         }
 
         /**
-         * A session's downloaded ts3image banner. The address carries a per-session token that only the tab the
-         * state was pushed to knows, so this is not a door to anyone else's transfer.
+         * A server's ts3image banner, addressed by the stable hash of its gfx url (see WebSession.bannerCacheKey).
+         * Same banner = same address across tabs and refreshes, so the browser and proxies can keep it; the bytes
+         * live in a shared gateway cache instead of each session downloading its own copy.
          */
-        get("/server-banner/{id}") {
-            val data = WebSession.byBanner(call.parameters["id"].orEmpty())?.bannerData()
+        get("/server-banner/{key}") {
+            val key = call.parameters["key"].orEmpty()
+            val data = if (key.length in 16..64) WebSession.cachedBanner(key) else null
             if (data == null) {
                 call.respond(HttpStatusCode.NotFound, "no banner")
             } else {
-                // 横幅字节按会话缓存；用内容哈希做 ETag，并允许浏览器缓存一小时，避免每次刷新重下。
+                // 内容哈希做 ETag；允许浏览器与反代缓存一小时，刷新时不必重下这张（可达数 MB 的）图。
                 val etag = "\"${data.first.contentHashCode().toUInt().toString(16)}\""
-                call.response.header("Cache-Control", "private, max-age=3600")
+                call.response.header("Cache-Control", "public, max-age=3600")
                 call.response.header("ETag", etag)
                 if (call.request.headers["If-None-Match"] == etag) {
                     call.respond(HttpStatusCode.NotModified)
