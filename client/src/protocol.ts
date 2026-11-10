@@ -429,6 +429,7 @@ const MUTE_PREF_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 const KEY = {
   identity: 'huixiang.identity',
+  guestIdentity: 'huixiang.identity.guest',
   token: 'huixiang.token',
   recent: 'huixiang.recent',
   nickname: 'huixiang.nickname',
@@ -449,6 +450,13 @@ export const store = {
   },
   setIdentity(v: string) {
     localStorage.setItem(KEY.identity, v);
+  },
+  /** 游客专用的本地身份，和账号身份分开，避免服务器把游客与已登录账号关联起来。 */
+  guestIdentity(): string | null {
+    return localStorage.getItem(KEY.guestIdentity);
+  },
+  setGuestIdentity(v: string) {
+    localStorage.setItem(KEY.guestIdentity, v);
   },
   token(): string {
     return localStorage.getItem(KEY.token) ?? '';

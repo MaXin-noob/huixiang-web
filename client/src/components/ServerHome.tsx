@@ -1929,15 +1929,17 @@ export default function ServerHome(props: Props) {
             >
               <IconFolder />
             </Button>
-            <Button
-              className="sh-icon-btn btn-semi"
-              htmlType="button"
-              title="好友与云聊天"
-              aria-pressed={friendsOpen}
-              onClick={openFriends}
-            >
-              <IconUserGroup />
-            </Button>
+            {account.phase === 'signedIn' && (
+              <Button
+                className="sh-icon-btn btn-semi"
+                htmlType="button"
+                title="好友与云聊天"
+                aria-pressed={friendsOpen}
+                onClick={openFriends}
+              >
+                <IconUserGroup />
+              </Button>
+            )}
             <Button
               className="sh-icon-btn btn-semi"
               htmlType="button"

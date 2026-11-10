@@ -241,8 +241,11 @@ class WebSession(
 
     // ====== What the tab asks for ======
 
-    fun connect(host: String, port: Int, nickname: String, password: String, identityText: String?, channel: String = "", channelPassword: String = "") {
+    fun connect(host: String, port: Int, nickname: String, password: String, identityText: String?, channel: String = "", channelPassword: String = "", guest: Boolean = false) {
         if (closed) return
+        // 游客登录：彻底按游客处理——先清掉本标签页可能已恢复的账号会话，
+        // 下面连接时不携带任何账号身份证明，服务器只会看到未登录客户端。
+        if (guest && account.voiceIdentity() != null) accountLogout()
         leave()
         val identity = try {
             if (identityText.isNullOrBlank()) Identity.generate() else Identity.import(identityText)
@@ -263,7 +266,8 @@ class WebSession(
         dirty.set(true)
         sink.text(Json.write(mapOf("t" to "identity", "v" to identity.export())))
 
-        val myTsIdentity = account.voiceIdentity()
+        // 游客：不携带账号身份证明，服务器只会当成未登录客户端。
+        val myTsIdentity = if (guest) null else account.voiceIdentity()
         val c = TsClient(this) { log("$address: $it") }
         owned?.close()
         owned = c
