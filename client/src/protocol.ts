@@ -241,6 +241,9 @@ export interface AccountState {
   username: string;
   email: string;
   avatarUrl: string;
+  identities?: { id: string; name: string; nickname: string; ts6Uid: string }[];
+  identitiesLoading?: boolean;
+  identitiesError?: string | null;
   error: string | null;
   /** 头像上传的凭据（HTTP 端点认 X-File-Token）。 */
   fileToken?: string;
@@ -412,6 +415,7 @@ export interface ConnectOptions {
   identity: string | null;
   /** 游客登录：昵称始终用用户自己填的，不被 myTeamSpeak 账号名覆盖 */
   guest?: boolean;
+  cloudIdentityId?: string;
 }
 
 // ====== 本地保存 ======

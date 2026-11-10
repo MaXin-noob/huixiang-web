@@ -195,7 +195,30 @@ export default function ConnectPage({
   const signedIn = account.phase === 'signedIn' && !!(account.username || account.email);
   // 账号登录取账号名；游客登录始终用用户自己填的昵称，哪怕已登录 myTeamSpeak
   const nick = mode === 'guest' ? nickname : effectiveNickname(account, nickname);
-  const canConnect = !!parsed && nick.trim().length > 0 && (!tokenNeeded || token.trim().length > 0) && agreed;
+  const identityChoices = account.identities ?? [];
+  const [identitySelection, setIdentitySelection] = useState<{ owner: string; id: string } | null>(null);
+  const identityOwner = (account.email || account.username).trim().toLowerCase();
+  const matchingIdentities = identityChoices.filter((entry) => entry.name === 'Default');
+  const selectedId = identitySelection?.owner === identityOwner && identityChoices.some((entry) => entry.id === identitySelection.id)
+    ? identitySelection.id : '';
+  const cloudIdentityReady = mode === 'guest' || !signedIn || (!account.identitiesLoading && !account.identitiesError && (matchingIdentities.length === 1 || !!selectedId));
+  const identityField = signedIn && (
+    <div className="login-field">
+      <label htmlFor="cloud-identity">账号身份</label>
+      {account.identitiesLoading ? <span className="login-hint">正在同步身份…</span> : account.identitiesError ?
+        <span className="field-error">身份同步失败，请刷新或重新登录（{account.identitiesError}）</span> :
+        matchingIdentities.length === 1 ? <span className="login-hint">自动使用 Default 同步身份</span> :
+        identityChoices.length === 0 ? <span className="field-error">没有可用的同步身份，请在官方客户端同步后刷新。</span> :
+        <>
+          <span className="login-hint">没有唯一的 Default，请选择一个账号同步身份。</span>
+          <select id="cloud-identity" value={selectedId} onChange={(e) => setIdentitySelection({ owner: identityOwner, id: e.target.value })}>
+            <option value="">请选择身份</option>
+            {identityChoices.map((entry) => <option key={entry.id} value={entry.id}>{entry.name || '未命名身份'}（{entry.ts6Uid.slice(0, 10)}）</option>)}
+          </select>
+        </>}
+    </div>
+  );
+  const canConnect = !!parsed && nick.trim().length > 0 && (!tokenNeeded || token.trim().length > 0) && agreed && cloudIdentityReady;
   const accountBusy = account.phase === 'busy';
   // 账号页签只填账号、密码、口令（要网关口令的话），协议勾上就能点「登录」；
   // 服务器地址和服务器密码留到登录后的中间页再填，那里还能挑云书签。
@@ -288,6 +311,7 @@ export default function ConnectPage({
       password,
       identity: store.identity(),
       guest: mode === 'guest',
+      cloudIdentityId: matchingIdentities.length === 1 ? undefined : selectedId || undefined,
     });
   };
 
@@ -570,6 +594,7 @@ export default function ConnectPage({
 
                 {signedIn && (
                   <>
+                    {identityField}
                     <div className="login-bookmarks">
                       <div className="login-bookmarks-head">
                         <span>云书签</span>

@@ -177,7 +177,7 @@ export default function App() {
   const playerRef = useRef<VoicePlayer | null>(null);
   const micRef = useRef<MicSender | null>(null);
   const streamRef = useRef<StreamClient | null>(null);
-  const lastAddress = useRef<{ address: string; nickname: string; guest?: boolean } | null>(null);
+  const lastAddress = useRef<{ address: string; nickname: string; guest?: boolean; cloudIdentityId?: string; identityOwner: string } | null>(null);
   // 当前这条网关连接是不是游客连接：网关回推 identity 时要存到游客键，别覆盖账号身份。
   const guestConnectRef = useRef(false);
   // 最近一次连接用的凭据，用来生成「分享连接」（只在内存里，不落盘）
@@ -657,7 +657,8 @@ export default function App() {
       setPing({ gateway: null, server: null });
       // 记住的是「用户自己的昵称」：登录时连进来用的是账号名，退出登录后重连还要回到自定义昵称
       const remembered = opts.nickname === store.nickname() ? opts.nickname : store.nickname() || opts.nickname;
-      lastAddress.current = { address: opts.host, nickname: remembered, guest: opts.guest };
+      lastAddress.current = { address: opts.host, nickname: remembered, guest: opts.guest,
+        cloudIdentityId: opts.cloudIdentityId, identityOwner: (account.email || account.username).trim().toLowerCase() };
       setChat([]);
       try {
         ensurePlayer();
@@ -679,7 +680,7 @@ export default function App() {
         }
       }
     },
-    [ensurePlayer, talking, openGateway],
+    [ensurePlayer, talking, openGateway, account.email, account.username],
   );
 
   const connect = useCallback(
@@ -712,6 +713,7 @@ export default function App() {
         password: '',
         identity: last.guest ? store.guestIdentity() : store.identity(),
         guest: last.guest,
+        cloudIdentityId: last.identityOwner && last.identityOwner === (account.email || account.username).trim().toLowerCase() ? last.cloudIdentityId : undefined,
       },
       tokenNeeded ? token : '',
     );
