@@ -178,6 +178,8 @@ export default function App() {
   const micRef = useRef<MicSender | null>(null);
   const streamRef = useRef<StreamClient | null>(null);
   const lastAddress = useRef<{ address: string; nickname: string; guest?: boolean } | null>(null);
+  // 当前这条网关连接是不是游客连接：网关回推 identity 时要存到游客键，别覆盖账号身份。
+  const guestConnectRef = useRef(false);
   // 最近一次连接用的凭据，用来生成「分享连接」（只在内存里，不落盘）
   const lastCreds = useRef<{ host: string; port: number; password: string; token: string }>({
     host: '',
@@ -373,7 +375,10 @@ export default function App() {
         }
       }
       const g = new Gateway(gatewayUrl(), useToken, {
-        onIdentity: (v) => store.setIdentity(v),
+        onIdentity: (v) => {
+          if (guestConnectRef.current) store.setGuestIdentity(v);
+          else store.setIdentity(v);
+        },
         onState: (s) => {
           // 离开服务器后网关还会补推一帧 phase=idle 的快照。若照单全收，前端会停在一个空的服务器页，
           // 得再点一次才回登录页——所以 idle 一律当作「已离开」，直接回连接页（错误照常显示）。
@@ -643,6 +648,7 @@ export default function App() {
   const doConnect = useCallback(
     async (opts: ConnectOptions, useToken: string) => {
       lastCreds.current = { host: opts.host, port: opts.port, password: opts.password ?? '', token: useToken };
+      guestConnectRef.current = !!opts.guest;
       setError(null);
       setConnecting(true);
       talking.reset();
@@ -677,13 +683,20 @@ export default function App() {
   );
 
   const connect = useCallback(
-    (opts: ConnectOptions) => {
+    async (opts: ConnectOptions) => {
       if (tokenNeeded) store.setToken(token);
       // 游客登录始终用用户自己填的昵称，哪怕已登录 myTeamSpeak；账号登录在已登录时强制用账号名。
       // 只有真正用的是用户自己的昵称才写回本地，免得账号名覆盖掉 huixiang.nickname
       const nickname = opts.guest ? opts.nickname : effectiveNickname(account, opts.nickname);
       if (opts.guest || !accountNickname(account)) store.setNickname(opts.nickname);
-      void doConnect({ ...opts, nickname, identity: store.identity() }, tokenNeeded ? token : '');
+      // 游客就是游客：进服前彻底退出账号（删掉记住登录的 cookie、让网关丢弃账号会话），
+      // 并使用与账号分开的游客身份，避免服务器把游客认成已登录账号。
+      if (opts.guest) {
+        await forgetAccount();
+        gatewayRef.current?.accountLogout();
+      }
+      const identity = opts.guest ? store.guestIdentity() : store.identity();
+      void doConnect({ ...opts, nickname, identity }, tokenNeeded ? token : '');
     },
     [account, doConnect, token, tokenNeeded],
   );
@@ -697,7 +710,7 @@ export default function App() {
         port: 9987,
         nickname: last.guest ? last.nickname : effectiveNickname(account, last.nickname),
         password: '',
-        identity: store.identity(),
+        identity: last.guest ? store.guestIdentity() : store.identity(),
         guest: last.guest,
       },
       tokenNeeded ? token : '',
@@ -741,13 +754,16 @@ export default function App() {
       }
       // 用掉就把 hash 去掉，避免刷新重复触发
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      // 匿名进入也是纯游客：退出当前账号并使用独立游客身份。
+      await forgetAccount();
+      gatewayRef.current?.accountLogout();
       void doConnect(
         {
           host: payload.h,
           port: payload.p,
           nickname: '匿名用户',
           password: payload.pw ?? '',
-          identity: store.identity(),
+          identity: store.guestIdentity(),
           guest: true,
         },
         tokenNeeded ? payload.t ?? '' : '',
