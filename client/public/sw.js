@@ -14,7 +14,7 @@
  * - 导航请求网络优先，失败回退到缓存的 index.html（离线也能开壳）。
  */
 
-const CACHE = 'huixiang-shell-v1';
+const CACHE = 'huixiang-shell-v2';
 
 // 固定路径的壳资源（可预缓存）；构建产物带 hash，不在此列。
 const SHELL = [
@@ -94,8 +94,10 @@ self.addEventListener('fetch', (event) => {
   if (req.mode === 'navigate') {
     event.respondWith(
       (async () => {
+        // no-store：导航请求绕过 HTTP 缓存，确保每次在线打开都是最新 index.html，
+        // 否则旧壳可能长期指向旧的构建产物（表现为界面停在旧版、按钮没反应）。
         try {
-          return await fetch(req);
+          return await fetch(req, { cache: 'no-store' });
         } catch {
           const cache = await caches.open(CACHE);
           return (

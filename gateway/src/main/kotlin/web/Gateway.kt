@@ -727,8 +727,11 @@ fun Application.gateway(dist: File, access: Access, history: ChannelHistory) {
                 val file = File(dist, path.ifEmpty { "index.html" })
                 val safe = file.canonicalPath.startsWith(dist.canonicalPath)
                 if (safe && file.isFile) {
+                    // 入口与 SW 必须每次回源校验（no-cache）；带 hash 的构建产物可长缓存。
+                    call.response.header("Cache-Control", staticCacheControl(path))
                     call.respondFile(file)
                 } else if (safe && path.isNotEmpty() && !path.contains('.')) {
+                    call.response.header("Cache-Control", "no-cache")
                     call.respondFile(File(dist, "index.html"))
                 } else {
                     call.respond(HttpStatusCode.NotFound, "Not found")
@@ -736,6 +739,16 @@ fun Application.gateway(dist: File, access: Access, history: ChannelHistory) {
             }
         }
     }
+}
+
+/**
+ * 静态资源的缓存策略：入口 / Service Worker / manifest 不缓存（每次都回源校验），
+ * 带内容 hash 的构建产物可以一年长缓存，其余静态资源缓存一天。
+ */
+private fun staticCacheControl(path: String): String = when {
+    path.isEmpty() || path == "index.html" || path == "sw.js" || path == "manifest.webmanifest" -> "no-cache"
+    path.startsWith("assets/") -> "public, max-age=31536000, immutable"
+    else -> "public, max-age=86400"
 }
 
 /**

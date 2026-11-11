@@ -1044,7 +1044,14 @@ export default function App() {
   /** 暂离：不本地记状态，交给服务器，确认后经 state 的 away 推回。 */
   const toggleAway = useCallback((next: boolean) => {
     const s = stateRef.current;
-    gatewayRef.current?.setAway(next, s?.awayMessage ?? '');
+    // 没连上服务器时点暂离不会生效，明确提示，避免"点了没反应"。
+    if (!s || s.phase !== 'connected') {
+      Toast.warning('还没连上服务器，暂离暂时用不了');
+      return;
+    }
+    if (s.away === next) return;
+    gatewayRef.current?.setAway(next, s.awayMessage ?? '');
+    Toast.success(next ? '已设为暂离' : '已取消暂离');
   }, []);
 
   const setAwayMessage = useCallback((message: string) => {
