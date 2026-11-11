@@ -795,6 +795,7 @@ export default function ServerHome(props: Props) {
         maxClients: chanForm.maxClients,
         parent: chanForm.parent,
         after: 0,
+        iconId: chanForm.iconId > 0 ? chanForm.iconId : undefined,
       });
       setChanDialog(null);
       return;
@@ -2194,7 +2195,7 @@ export default function ServerHome(props: Props) {
                 />
               </label>
 
-              {chanDialog.mode === 'edit' && (
+              {(chanDialog.mode === 'edit' || chanDialog.mode === 'create') && (
                 <div className="sh-form-row">
                   <span className="sh-form-label">头像</span>
                   <div className="sh-form-inline sh-chan-icon-edit">

@@ -25,6 +25,7 @@ Android 应用的版本记录在仓库根目录的 [CHANGELOG.md](../CHANGELOG.m
 
 - 新增频道管理下行/上行 `channel` 消息：`act` = `create` / `edit` / `delete` / `kick` / `ban`。网关用 `tsproto` 的 `ChannelEdits` 生成 `channelcreate` / `channeledit`（换父级时补 `channelmove`）/ `channeldelete`，踢人用 `clientkick`、封禁用 `banclient`；权限由服务器判定，失败以中文回页面。
 - 频道管理命令统一带 `return_code`，网关把一次操作的若干条命令聚合成一条下行 `chanOp`（`id` / `label` / `ok` / `error`）；带 `return_code` 的 error 帧不再被当成会话级错误弹红条。
+- 新建频道支持设置头像：前端新建对话框可选图并随 `channelcreate` 带 `iconId`；网关从 `channelcreate` 应答里取回服务器分配的新 `cid`，再用 `channeladdperm` 写频道权限 `i_icon_id`（与编辑频道走同一套 `ChannelEdits.iconPerm`）。
 - 状态快照的频道节点新增 `description` / `kind`（permanent/semi/temporary）/ `quality` / `order`，供前端编辑表单回填。
 - 新增「戳一戳」：成员资料卡右上角的按钮，网关用 `clientpoke` 发给指定成员（不带自定义文案），成功/失败按 `chanOp` 回执弹「戳一戳成功 / 失败：原因」；收到 `notifyclientpoke` 时以 `poke` 下行消息推到页面弹提示，与官方客户端一样不进聊天记录。
 

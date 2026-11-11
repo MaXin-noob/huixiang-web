@@ -160,6 +160,8 @@ export interface ChannelCreate {
   maxClients?: number;
   parent?: number;
   after?: number;
+  /** 频道图标 id：新建时可选；1000+ 指向服务器文件 /icon_<id>。 */
+  iconId?: number;
 }
 
 /** 改频道：只提交要改的字段，网关以服务器上的当前值为基准做 diff。 */
