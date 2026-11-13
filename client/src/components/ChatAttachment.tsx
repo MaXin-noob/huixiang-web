@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button, Toast } from '@douyinfe/semi-ui';
+import { Button } from '@douyinfe/semi-ui';
+import { showError } from '../feedback';
 import { IconDownload, IconFile } from '@douyinfe/semi-icons';
 import { downloadFile, formatBytes, saveBlob } from '../files';
 import { getImageBlobCached, imageCacheKey } from '../imageCache';
@@ -50,14 +51,14 @@ export default function ChatAttachment({ att, token }: Props) {
 
   const download = async () => {
     if (!token) {
-      Toast.error('还没连上服务器，暂时无法下载');
+      showError('还没连上服务器，暂时无法下载');
       return;
     }
     try {
       const blob = await downloadFile({ token, cid: att.cid, path: att.path, expectedSize: att.size });
       saveBlob(blob, att.name);
     } catch (e: unknown) {
-      Toast.error(e instanceof Error ? e.message : String(e));
+      showError(e instanceof Error ? e.message : String(e));
     }
   };
 

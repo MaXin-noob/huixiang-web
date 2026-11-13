@@ -21,6 +21,7 @@ import {
   Toast,
   Typography,
 } from '@douyinfe/semi-ui';
+import { confirmDanger, showError } from '../feedback';
 import {
   IconMore,
   IconEdit,
@@ -750,7 +751,7 @@ export default function ServerHome(props: Props) {
       return;
     }
     if (!fileToken) {
-      Toast.error('文件传输还没准备好，请稍后再试');
+      showError('文件传输还没准备好，请稍后再试');
       return;
     }
     setChanIconBusy(true);
@@ -765,7 +766,7 @@ export default function ServerHome(props: Props) {
       setChanForm((f) => ({ ...f, iconId: id }));
       Toast.success('频道头像已上传，保存后生效');
     } catch (e) {
-      Toast.error(e instanceof Error ? e.message : '频道头像上传失败');
+      showError(e instanceof Error ? e.message : '频道头像上传失败');
     } finally {
       setChanIconBusy(false);
     }
@@ -795,6 +796,7 @@ export default function ServerHome(props: Props) {
         maxClients: chanForm.maxClients,
         parent: chanForm.parent,
         after: 0,
+        iconId: chanForm.iconId > 0 ? chanForm.iconId : undefined,
       });
       setChanDialog(null);
       return;
@@ -863,11 +865,11 @@ export default function ServerHome(props: Props) {
   /** 选文件前先挡住不能传的情况，避免用户点了没反应。 */
   const pickAttachment = (kind: 'image' | 'file') => {
     if (!connected) {
-      Toast.error('还没连上服务器');
+      showError('还没连上服务器');
       return;
     }
     if (!fileToken) {
-      Toast.error('文件功能尚未就绪，请稍后重试');
+      showError('文件功能尚未就绪，请稍后重试');
       return;
     }
     (kind === 'image' ? imageInputRef : fileInputRef).current?.click();
@@ -879,16 +881,16 @@ export default function ServerHome(props: Props) {
    */
   const sendAttachment = async (file: File, kind: 'image' | 'file') => {
     if (!connected) {
-      Toast.error('还没连上服务器');
+      showError('还没连上服务器');
       return;
     }
     if (!fileToken) {
-      Toast.error('文件功能尚未就绪，请稍后重试');
+      showError('文件功能尚未就绪，请稍后重试');
       return;
     }
     const MAX_ATTACH = 100 * 1024 * 1024;
     if (file.size > MAX_ATTACH) {
-      Toast.error(`${file.name} 超过 100 MB，请换个小一点的文件`);
+      showError(`${file.name} 超过 100 MB，请换个小一点的文件`);
       return;
     }
     setAttachBusy(true);
@@ -917,7 +919,7 @@ export default function ServerHome(props: Props) {
           : `${label} ${file.name}（${formatBytes(file.size)}）\n${encodeAttachment(att)}`;
       onSay(body);
     } catch (e: unknown) {
-      Toast.error(`${file.name}：${e instanceof Error ? e.message : String(e)}`);
+      showError(`${file.name}：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setAttachBusy(false);
     }
@@ -1006,12 +1008,10 @@ export default function ServerHome(props: Props) {
     }
   };
   const confirmRemoveAvatar = () => {
-    Modal.confirm({
+    confirmDanger({
       title: '删除账号头像',
       content: '删除后将以昵称首字母显示，确定删除吗？',
       okText: '删除',
-      cancelText: '取消',
-      okButtonProps: { type: 'danger' },
       onOk: async () => {
         setAvatarBusy(true);
         try {
@@ -1028,7 +1028,7 @@ export default function ServerHome(props: Props) {
       await navigator.clipboard.writeText(state.address);
       Toast.success('地址已复制');
     } catch {
-      Toast.error('复制失败');
+      showError('复制失败');
     }
   };
 
@@ -1037,13 +1037,13 @@ export default function ServerHome(props: Props) {
     try {
       const url = await onShareLink();
       if (!url) {
-        Toast.error('当前没有可分享的服务器信息');
+        showError('当前没有可分享的服务器信息');
         return;
       }
       setShareUrl(url);
       setShareOpen(true);
     } catch {
-      Toast.error('生成分享连接失败');
+      showError('生成分享连接失败');
     }
   };
 
@@ -1052,7 +1052,7 @@ export default function ServerHome(props: Props) {
       await navigator.clipboard.writeText(shareUrl);
       Toast.success('分享连接已复制');
     } catch {
-      Toast.error('复制失败');
+      showError('复制失败');
     }
   };
 
@@ -1281,7 +1281,7 @@ export default function ServerHome(props: Props) {
                             void navigator.clipboard
                               ?.writeText(String(channel.id))
                               .then(() => Toast.success('已复制频道 ID'))
-                              .catch(() => Toast.error('复制失败'));
+                              .catch(() => showError('复制失败'));
                           }}
                         >
                           <span className="sh-dd-label">复制频道 ID</span>
@@ -2194,7 +2194,7 @@ export default function ServerHome(props: Props) {
                 />
               </label>
 
-              {chanDialog.mode === 'edit' && (
+              {(chanDialog.mode === 'edit' || chanDialog.mode === 'create') && (
                 <div className="sh-form-row">
                   <span className="sh-form-label">头像</span>
                   <div className="sh-form-inline sh-chan-icon-edit">
@@ -2470,7 +2470,7 @@ export default function ServerHome(props: Props) {
               取消
             </Button>
             <Button
-              className={`${modTarget.kind === 'ban' ? 'sh-btn-danger' : 'sh-btn-primary'} btn-semi`}
+              className={`${modTarget.kind === 'ban' || modTarget.kind === 'server' ? 'sh-btn-danger' : 'sh-btn-primary'} btn-semi`}
               htmlType="button"
               onClick={submitMod}
             >

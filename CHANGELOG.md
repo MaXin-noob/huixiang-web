@@ -5,6 +5,7 @@ Android 应用的版本记录在仓库根目录的 [CHANGELOG.md](../CHANGELOG.m
 
 ## 网页版网关（未发布）
 
+- 统一危险操作二次确认与错误提示：新增 `web/client/src/feedback.ts`——`confirmDanger` 提供红色、居中、点遮罩不关闭的二次确认，`showError` 把异常 / 字符串归一化成一句可读文案且同一消息 3 秒内只弹一次；账号头像删除改用统一确认，踢出服务器改用红色危险按钮，各页面原先散落的 `Toast.error` 全部改走 `showError`。
 - 修复「暂离」按钮点击无反馈：未连接服务器时明确提示、切换成功时弹出 Toast（「已设为暂离」/「已取消暂离」）；同时给 Service Worker 提升缓存版本、导航请求绕过 HTTP 缓存，并在网关给入口页与 `sw.js` 回 `no-cache`、带 hash 的构建产物回长缓存（`immutable`），避免浏览器长期停留在旧构建（旧版暂离是弹层，浮层被裁切时看起来像「点了没反应」）。
 - 新增 `web/gateway`：一个纯 JVM 服务，直接复用 `tsproto` 协议模块（与 App 完全同一份代码），通过 WebSocket 把 TeamSpeak 连接交给浏览器。
 - 浏览器打不开 UDP socket，所以语音和信令由网关代为持有；音频是裸 Opus 帧直通，不转码，浏览器用 WebCodecs 自行编解码。
@@ -26,6 +27,7 @@ Android 应用的版本记录在仓库根目录的 [CHANGELOG.md](../CHANGELOG.m
 
 - 新增频道管理下行/上行 `channel` 消息：`act` = `create` / `edit` / `delete` / `kick` / `ban`。网关用 `tsproto` 的 `ChannelEdits` 生成 `channelcreate` / `channeledit`（换父级时补 `channelmove`）/ `channeldelete`，踢人用 `clientkick`、封禁用 `banclient`；权限由服务器判定，失败以中文回页面。
 - 频道管理命令统一带 `return_code`，网关把一次操作的若干条命令聚合成一条下行 `chanOp`（`id` / `label` / `ok` / `error`）；带 `return_code` 的 error 帧不再被当成会话级错误弹红条。
+- 新建频道支持设置头像：前端新建对话框可选图并随 `channelcreate` 带 `iconId`；网关从 `channelcreate` 应答里取回服务器分配的新 `cid`，再用 `channeladdperm` 写频道权限 `i_icon_id`（与编辑频道走同一套 `ChannelEdits.iconPerm`）。
 - 状态快照的频道节点新增 `description` / `kind`（permanent/semi/temporary）/ `quality` / `order`，供前端编辑表单回填。
 - 新增「戳一戳」：成员资料卡右上角的按钮，网关用 `clientpoke` 发给指定成员（不带自定义文案），成功/失败按 `chanOp` 回执弹「戳一戳成功 / 失败：原因」；收到 `notifyclientpoke` 时以 `poke` 下行消息推到页面弹提示，与官方客户端一样不进聊天记录。
 

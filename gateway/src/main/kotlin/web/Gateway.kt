@@ -910,6 +910,7 @@ private fun onChannel(session: WebSession, m: Map<*, *>) {
             maxClients = (m["maxClients"] as? Number)?.toInt() ?: -1,
             parent = (m["parent"] as? Number)?.toInt() ?: 0,
             after = (m["after"] as? Number)?.toInt() ?: 0,
+            iconId = (m["iconId"] as? Number)?.toLong(),
         )
         "edit" -> session.editChannel(
             cid = (m["cid"] as? Number)?.toInt() ?: return,

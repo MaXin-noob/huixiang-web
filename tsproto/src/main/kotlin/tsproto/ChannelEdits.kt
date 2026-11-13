@@ -73,13 +73,7 @@ object ChannelEdits {
         if (s.maxClients != ch.maxClients) p += maxClients(s.maxClients)
         if (p.isNotEmpty()) out += Edit("channeledit", listOf("cid" to ch.id) + p)
         // 频道图标在 TS6 里是权限 i_icon_id，不是 channeledit 的参数（发 channel_icon_id 会回 invalid parameter）。
-        if (s.iconId != ch.iconId) {
-            out += if (s.iconId > 0) {
-                Edit("channeladdperm", listOf("cid" to ch.id, "permsid" to "i_icon_id", "permvalue" to s.iconId))
-            } else {
-                Edit("channeldelperm", listOf("cid" to ch.id, "permsid" to "i_icon_id"))
-            }
-        }
+        if (s.iconId != ch.iconId) out += iconPerm(ch.id, s.iconId)
         // Into another parent: first there (a channelmove can't stay in the same parent)
         if (s.parent != ch.parent) out += Edit("channelmove", listOf("cid" to ch.id, "cpid" to s.parent, "order" to s.after))
         return out
@@ -87,6 +81,17 @@ object ChannelEdits {
 
     /** [ch] to come after [after] (0 = first) among its siblings. */
     fun reorder(ch: ServerModel.Channel, after: Int) = Edit("channeledit", listOf("cid" to ch.id, "channel_order" to after))
+
+    /**
+     * The command that sets channel [cid]'s icon to [iconId] (0 removes it). On TeamSpeak 6 this is the channel
+     * permission `i_icon_id`, which is why a brand-new channel gets it from a follow-up `channeladdperm` after the
+     * server has assigned its `cid` (同 [edit] 里改图标的那条路径)。
+     */
+    fun iconPerm(cid: Int, iconId: Long) = if (iconId > 0) {
+        Edit("channeladdperm", listOf("cid" to cid, "permsid" to "i_icon_id", "permvalue" to iconId))
+    } else {
+        Edit("channeldelperm", listOf("cid" to cid, "permsid" to "i_icon_id"))
+    }
 
     /** Deleted, with its sub-channels; the people in them go to the default channel. */
     fun delete(ch: ServerModel.Channel) = Edit("channeldelete", listOf("cid" to ch.id, "force" to 1))

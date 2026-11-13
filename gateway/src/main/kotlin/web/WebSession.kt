@@ -156,6 +156,12 @@ class WebSession(
     private val opSeq = AtomicInteger(0)
     private val pendingOps = ConcurrentHashMap<String, OpState>()
 
+    /**
+     * 新建频道时选了头像的那批操作：频道图标是权限 `i_icon_id`，得等 `channelcreate` 应答带回新频道的 `cid`
+     * 后，再补一条 `channeladdperm`。这里按 return_code 记下待设的图标 id，见 [handleOpResult]。
+     */
+    private val pendingCreateIcons = ConcurrentHashMap<String, Long>()
+
     private class OpState(val label: String, var remaining: Int, var failed: Boolean = false)
 
     /**
@@ -549,6 +555,7 @@ class WebSession(
         maxClients: Int,
         parent: Int,
         after: Int,
+        iconId: Long?,
     ) {
         val c = client ?: return
         if (name.isBlank()) return
@@ -563,8 +570,18 @@ class WebSession(
             maxClients = maxClients,
             parent = parent,
             after = after,
+            iconId = iconId ?: 0,
         )
-        sendOp(c, "创建频道", listOf(ChannelEdits.create(s)))
+        val create = ChannelEdits.create(s)
+        if (iconId == null || iconId <= 0) {
+            sendOp(c, "创建频道", listOf(create))
+            return
+        }
+        // 图标是频道权限 `i_icon_id`：先建频道，等应答带回服务器分配的新 cid，再补 channeladdperm。
+        val id = "chop-" + opSeq.incrementAndGet()
+        pendingOps[id] = OpState("创建频道", 1)
+        pendingCreateIcons[id] = iconId
+        c.sendCommand(Commands.build(create.name, *(create.params + ("return_code" to id)).toTypedArray()))
     }
 
     fun editChannel(
@@ -669,10 +686,17 @@ class WebSession(
         }
     }
 
-    /** 频道管理命令的应答（带 return_code 的 error 帧）。 */
-    private fun handleOpResult(returnCode: String, errorId: String?, message: String, extra: String?) {
+    /** 频道管理命令的应答（带 return_code 的 error 帧）。[cid] 是 channelcreate 之类命令应答里带回的新频道 id。 */
+    private fun handleOpResult(returnCode: String, errorId: String?, message: String, extra: String?, cid: Int? = null) {
         val op = pendingOps[returnCode] ?: return
         if (errorId == null || errorId == "0") {
+            // 新建频道且带了头像：拿到新 cid 后补一条 channeladdperm，仍用同一个 return_code，等它的应答再收尾。
+            val icon = pendingCreateIcons.remove(returnCode)
+            if (icon != null && icon > 0 && cid != null && cid > 0 && !op.failed) {
+                val e = ChannelEdits.iconPerm(cid, icon)
+                client?.sendCommand(Commands.build(e.name, *(e.params + ("return_code" to returnCode)).toTypedArray()))
+                return
+            }
             op.remaining -= 1
             if (op.remaining <= 0 && !op.failed) {
                 pendingOps.remove(returnCode)
@@ -681,6 +705,7 @@ class WebSession(
         } else {
             op.failed = true
             pendingOps.remove(returnCode)
+            pendingCreateIcons.remove(returnCode)
             pushOp(returnCode, op.label, false, errorText(errorId, message, extra))
         }
     }
@@ -1169,7 +1194,7 @@ class WebSession(
                 // 带 return_code 的是某一条命令的应答（文件传输、静默查询、频道管理），该由发命令的那一方处理：
                 // 空文件夹的 1281、没权限的 2568 都会这样回来，报到会话级就成了莫名其妙的红条
                 if (rc != null) {
-                    handleOpResult(rc, id, cmd["msg"].orEmpty(), cmd["extra_msg"])
+                    handleOpResult(rc, id, cmd["msg"].orEmpty(), cmd["extra_msg"], cmd["cid"]?.toIntOrNull())
                 } else if (id != null && id != "0") {
                     error = errorText(id, cmd["msg"].orEmpty(), cmd["extra_msg"])
                     dirty.set(true)
