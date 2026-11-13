@@ -85,7 +85,7 @@ src/
 - 选择存在 `huixiang.micMode`。自动模式要一直听，所以 worklet 不会静音，只是不编码。
 - 头像点亮的门槛是另一个常量 `TALK_LEVEL = 0.045`，只管显示，跟发不发无关。
 
-> 说明：三档切换的界面入口尚未在 `ServerHome` 接入（`onMicMode` / `onPttHold` 回调已由 `App.tsx` 备好），当前固定为「自动」档。
+> 说明：三档切换的界面入口在服务器页「设置 → 说话方式」里（`ServerHome` 的 Radio 组，`onMicMode` / `onPttHold` 由 `App.tsx` 提供），默认「自动」档；按住说话可用空格键或左栏底部麦克风按钮。
 
 ## 浏览器要求
 
@@ -136,7 +136,7 @@ FAKE_MIC=1 node test/shot.mjs http://127.0.0.1:8080/ shot.png 3000 "..."
 连接页顶部是 myTeamSpeak 账号卡片，下面仍是原来的游客连接表单——不登录也能填地址进。
 
 - 登录后显示账号昵称、邮箱和头像，并拉取云书签和好友列表；点云书签会把地址、昵称和服务器密码填进表单（密码不显示）。
-- 头像上传 / 删除的界面入口随服务器页重构暂时下线：`account.ts` 已实现裁图（320×320、512 KB 内 PNG）与 `POST /account/avatar`，`App.tsx` 也已备好 `changeAccountAvatar` / `removeAccountAvatarNow`，待 `ServerHome` 提供入口后即可恢复。
+- 头像上传 / 删除在服务器页「设置 → 个人资料」里：`account.ts` 负责裁图（320×320、512 KB 内 PNG）与 `POST /account/avatar`，`ServerHome` 已接入上传 / 更换 / 删除入口，`removeAccountAvatarNow` 也由 `App.tsx` 提供。
 - 频道里成员头像优先用服务器头像（`/avatar/<avatarToken>/<id>?v=<flag>`），其次对方公开的 myTS 头像，失败退回首字母；自己登录时优先用账号头像。
 - 好友既可查看列表，也能跨服云聊天（Matrix）；登录后连接会带 myTeamSpeak 语音身份，要完全匿名先退出账号。
 - **记住登录**：密码登录成功后网关发一条 `remember` 消息，`account.ts` 把它换成 `HttpOnly` cookie（30 天）；之后打开或刷新页面会自动连上网关并恢复登录，退出登录则删掉 cookie。密码、令牌和书签密钥都不进浏览器存储。
@@ -152,7 +152,7 @@ FAKE_MIC=1 node test/shot.mjs http://127.0.0.1:8080/ shot.png 3000 "..."
 
 ## 频道管理
 
-网关与 `tsproto.ChannelEdits` 已实现建 / 删 / 改频道、踢人与封禁，以及频道排序；`App.tsx` 也把 `onCreateChannel`、`onEditChannel`、`onDeleteChannel`、`onKickMember`、`onBanMember` 等回调传给了服务器页。新版 `ServerHome` 已接入**新建 / 编辑 / 删除频道**（表单含名称、描述、父频道、类型、编解码、音质、人数上限与密码）；**踢人 / 封禁、频道排序**的界面入口尚未接入，旧的 `ServerPage` / `ChannelTree` 已随重构删除，需在新页面上重新接入。
+网关与 `tsproto.ChannelEdits` 已实现建 / 删 / 改频道、踢人与封禁、频道排序；`App.tsx` 把 `onCreateChannel`、`onEditChannel`、`onDeleteChannel`、`onKickMember`、`onBanMember` 等回调传给了服务器页。`ServerHome` 已接入**新建 / 编辑 / 删除频道**（表单含名称、描述、父频道、类型、编解码、音质、人数上限、密码，新建时也可设置图标）、**踢人 / 封禁**、**上移 / 下移排序**。
 
 ## 成员进出提示
 
@@ -162,9 +162,9 @@ FAKE_MIC=1 node test/shot.mjs http://127.0.0.1:8080/ shot.png 3000 "..."
 
 **已接入服务器页（`ServerHome`）**：频道列表（图标、密码锁、分隔符、折叠、按频道/成员搜索、双击进入含频道密码）、频道管理（新建 / 编辑 / 删除）、频道描述与在线人数、成员列表（说话状态、离开、直播中、资料卡、单人音量）、频道文字与历史翻页、「设置」里的桌面通知与说话方式三档切换（自动 / 常开 / 按住说话）、暂离（Away）、麦克风/扬声器音量、屏幕共享（WebRTC）与观看直播、频道文件（`FilesPanel`）、好友与云聊天（`FriendsPanel`）、戳一戳（成员资料卡右上角）、离开服务器。
 
-**逻辑已就绪、界面接入中**：移动成员到频道、摄像头共享入口；频道踢人 / 封禁、频道排序、账号头像上传 / 删除、改名自己均已接入界面。详见根目录 README 的「开发计划」。
+**尚未接入界面**：移动成员到频道（目前只支持自己切换频道）、摄像头共享入口。其余见下方「尚未实现」。详见根目录 README 的「开发计划」。
 
-**尚未实现**：频道聊天内发图片、身份组 / 权限面板、流媒体中继、触屏适配等。
+**尚未实现**：身份组 / 权限面板、封禁列表 / 解封、频道描述弹窗、设为优先发言人、身份安全等级提升、复制频道、被移动 / 频道邀请的桌面通知、移动成员到频道、摄像头共享入口、流媒体中继（外部转推）等。详见根目录 README 的「开发计划」。
 
 > 说明：旧版 `ServerPage` 时代的私聊面板已合并进「好友」抽屉——对方在线走服务器私聊，离线走云端聊天（Matrix）。
 
