@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Toast } from '@douyinfe/semi-ui';
+import { showError } from './feedback';
 import { Gateway, tokenRequired } from './gateway';
 import { PingWindow, type PingSample } from './pingStats';
 import {
@@ -230,7 +231,7 @@ export default function App() {
   const lastStreamError = useRef<string | null>(null);
   useEffect(() => {
     const e = streamState.error;
-    if (e && e !== lastStreamError.current) Toast.error(e);
+    if (e && e !== lastStreamError.current) showError(e);
     lastStreamError.current = e;
   }, [streamState.error]);
 
@@ -278,7 +279,7 @@ export default function App() {
         }
       }
       if (!micCodecAvailable()) {
-        if (!silent) Toast.error(webCodecsUnsupportedTip());
+        if (!silent) showError(webCodecsUnsupportedTip());
         return false;
       }
       const s = stateRef.current;
@@ -309,7 +310,7 @@ export default function App() {
         return true;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (!silent) Toast.error(msg.includes('Permission') ? '没有麦克风权限' : `麦克风打不开：${msg}`);
+        if (!silent) showError(msg.includes('Permission') ? '没有麦克风权限' : `麦克风打不开：${msg}`);
         mic.stop();
         return false;
       }
@@ -542,7 +543,7 @@ export default function App() {
         },
         onChanOp: (r) => {
           if (r.ok) Toast.success(`${r.label}成功`);
-          else Toast.error(`${r.label}失败：${r.error ?? '未知错误'}`);
+          else showError(`${r.label}失败：${r.error ?? '未知错误'}`);
         },
         onPerson: (p) => setPersonDetails((prev) => ({ ...prev, [p.id]: p })),
         // 服务器事件：实时追加；打开面板时网关会补一份本会话历史，直接替换。
@@ -776,7 +777,7 @@ export default function App() {
   const accountLogin = useCallback(
     async (email: string, password: string, otp: string) => {
       if (tokenNeeded && !token.trim()) {
-        Toast.error('先填网关访问口令');
+        showError('先填网关访问口令');
         return;
       }
       setAccount({ ...guestAccount(), phase: 'busy' });
@@ -810,11 +811,11 @@ export default function App() {
     async (file: File) => {
       const token = account.fileToken;
       if (!token) {
-        Toast.error('账号还没准备好，稍后再试');
+        showError('账号还没准备好，稍后再试');
         return;
       }
       const error = await uploadAccountAvatar(file, token);
-      if (error) Toast.error(error);
+      if (error) showError(error);
       else Toast.success('头像已更新');
     },
     [account.fileToken],
@@ -823,11 +824,11 @@ export default function App() {
   const removeAccountAvatarNow = useCallback(async () => {
     const token = account.fileToken;
     if (!token) {
-      Toast.error('账号还没准备好，稍后再试');
+      showError('账号还没准备好，稍后再试');
       return;
     }
     const error = await removeAccountAvatar(token);
-    if (error) Toast.error(error);
+    if (error) showError(error);
     else Toast.success('账号头像已删除');
   }, [account.fileToken]);
 
@@ -905,9 +906,9 @@ export default function App() {
       store.setNotify(true);
       setNotifyOn(true);
     } else if (p === 'denied') {
-      Toast.error('浏览器拒绝了通知权限，请在地址栏的站点设置里允许通知后再试');
+      showError('浏览器拒绝了通知权限，请在地址栏的站点设置里允许通知后再试');
     } else if (p === 'unsupported') {
-      Toast.error('这个浏览器不支持通知（需要 HTTPS 或 localhost 打开）');
+      showError('这个浏览器不支持通知（需要 HTTPS 或 localhost 打开）');
     } else {
       Toast.warning('没有拿到通知权限');
     }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Checkbox, Input, Tabs, Toast } from '@douyinfe/semi-ui';
+import { showError } from '../feedback';
 import { IconGlobe, IconKey, IconLock, IconServer, IconUser } from '@douyinfe/semi-icons';
 import { accountErrorText } from '../account';
 import {
@@ -257,7 +258,7 @@ export default function ConnectPage({
     }
     if (lastError.current === error) return;
     lastError.current = error;
-    Toast.error({ content: error, duration: 4 });
+    showError({ content: error, duration: 4 });
     onDismissError();
   }, [error, onDismissError]);
 
@@ -270,7 +271,7 @@ export default function ConnectPage({
     }
     if (lastAccountError.current === account.error) return;
     lastAccountError.current = account.error;
-    Toast.error({ content: accountErrorText(account.error), duration: 4 });
+    showError({ content: accountErrorText(account.error), duration: 4 });
   }, [account.error]);
 
   // 记住密码：登录成功后按勾选状态写入/清除本地

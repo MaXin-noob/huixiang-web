@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, Modal, SideSheet, Toast, Upload } from '@douyinfe/semi-ui';
+import { Button, Input, Modal, SideSheet, Upload } from '@douyinfe/semi-ui';
+import { showError } from '../feedback';
 import {
   IconChevronRight,
   IconDelete,
@@ -120,7 +121,7 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
   const startDownload = useCallback(
     (entry: FileEntry) => {
       if (!token) {
-        Toast.error('还没连上服务器');
+        showError('还没连上服务器');
         return;
       }
       const id = nextId();
@@ -143,7 +144,7 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
         .catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : String(e);
           update(id, { state: 'failed', error: msg });
-          Toast.error(`${entry.name}：${msg}`);
+          showError(`${entry.name}：${msg}`);
           fadeLater(id);
         });
     },
@@ -154,7 +155,7 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
   const doUpload = useCallback(
     (file: File, overwrite: boolean) => {
       if (!token) {
-        Toast.error('还没连上服务器');
+        showError('还没连上服务器');
         return;
       }
       // 服务器不接受中文/非 ASCII 文件名（file input/output error），上传前自动换成英文名
@@ -188,7 +189,7 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
             return;
           }
           update(id, { state: 'failed', error: msg });
-          Toast.error(`${file.name}：${msg}`);
+          showError(`${file.name}：${msg}`);
           fadeLater(id);
         });
     },
@@ -217,7 +218,7 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
     if (!dialog || busy) return;
     const name = dialogText.trim();
     if ((dialog.kind === 'mkdir' || dialog.kind === 'rename') && (!name || name.includes('/'))) {
-      Toast.error('名字不能为空，也不能包含斜杠');
+      showError('名字不能为空，也不能包含斜杠');
       return;
     }
     setBusy(true);
@@ -237,7 +238,7 @@ export default function FilesPanel({ open, cid, channelName, token, listing, onL
       setDialog(null);
       refresh();
     } catch (e: unknown) {
-      Toast.error(e instanceof Error ? e.message : String(e));
+      showError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }

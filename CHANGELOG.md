@@ -5,6 +5,7 @@ Android 应用的版本记录在仓库根目录的 [CHANGELOG.md](../CHANGELOG.m
 
 ## 网页版网关（未发布）
 
+- 统一危险操作二次确认与错误提示：新增 `web/client/src/feedback.ts`——`confirmDanger` 提供红色、居中、点遮罩不关闭的二次确认，`showError` 把异常 / 字符串归一化成一句可读文案且同一消息 3 秒内只弹一次；账号头像删除改用统一确认，踢出服务器改用红色危险按钮，各页面原先散落的 `Toast.error` 全部改走 `showError`。
 - 修复「暂离」按钮点击无反馈：未连接服务器时明确提示、切换成功时弹出 Toast（「已设为暂离」/「已取消暂离」）；同时给 Service Worker 提升缓存版本、导航请求绕过 HTTP 缓存，并在网关给入口页与 `sw.js` 回 `no-cache`、带 hash 的构建产物回长缓存（`immutable`），避免浏览器长期停留在旧构建（旧版暂离是弹层，浮层被裁切时看起来像「点了没反应」）。
 - 新增 `web/gateway`：一个纯 JVM 服务，直接复用 `tsproto` 协议模块（与 App 完全同一份代码），通过 WebSocket 把 TeamSpeak 连接交给浏览器。
 - 浏览器打不开 UDP socket，所以语音和信令由网关代为持有；音频是裸 Opus 帧直通，不转码，浏览器用 WebCodecs 自行编解码。
