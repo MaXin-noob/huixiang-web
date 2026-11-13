@@ -295,7 +295,9 @@ huixiang-web/
 
 ## 许可证
 
-本项目基于 [GNU General Public License v3.0](LICENSE)（GPL-3.0）发布，与安卓版一致。
+本项目整体基于 [MIT License](LICENSE) 发布，可自由使用、修改、分发，也允许闭源商用。
+
+> 例外：`tsproto/` 协议栈移植自开源项目 [PocketTS](https://github.com/korppujauho/pocketts)（以 GPL-3.0 发布），该子目录及其衍生代码仍遵循 **GPL-3.0**（见 [`tsproto/LICENSE`](tsproto/LICENSE) 与 [`tsproto/NOTICE.md`](tsproto/NOTICE.md)），不受上面的 MIT 授权覆盖。
 
 ## 相关仓库
 
