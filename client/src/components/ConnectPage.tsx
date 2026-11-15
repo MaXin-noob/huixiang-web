@@ -200,8 +200,10 @@ export default function ConnectPage({
   const [identitySelection, setIdentitySelection] = useState<{ owner: string; id: string } | null>(null);
   const identityOwner = (account.email || account.username).trim().toLowerCase();
   const matchingIdentities = identityChoices.filter((entry) => entry.name === 'Default');
+  // 没手动选过（或所选身份已不存在）时，默认选中第一个身份，省去用户再点一次。
   const selectedId = identitySelection?.owner === identityOwner && identityChoices.some((entry) => entry.id === identitySelection.id)
-    ? identitySelection.id : '';
+    ? identitySelection.id
+    : (identityChoices[0]?.id ?? '');
   const cloudIdentityReady = mode === 'guest' || !signedIn || (!account.identitiesLoading && !account.identitiesError && (matchingIdentities.length === 1 || !!selectedId));
   const identityField = signedIn && (
     <div className="login-field">
